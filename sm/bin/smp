@@ -1,0 +1,82 @@
+#!/bin/bash
+
+sm_path="/opt/sm" # BDSM framework path
+export PATH="${PATH}:${sm_path}"
+
+os_cpu_count()
+{
+  # Default the CPU count to 1
+  local _cpu_count=1
+
+  # If the operating system is Darwin (OSX),
+  # then read the CPU count using the sysctl key hw.ncpu, and trim off
+  # everything except the last space separated field.
+  if os is darwin
+  then
+    read -r _cpu_count < <(/usr/sbin/sysctl hw.ncpu)
+    _cpu_count="${_cpu_count##* }"
+  # If the operating system is Linux, gather the information directly from
+  # the proc filesystem.
+  elif os is linux
+  then
+    _cpu_count=$(awk '/^processor/{count++} END{print count}' /proc/cpuinfo 2>&1)
+  # Warn that this function has not yet been implemented for solaris.
+  elif os is solaris
+  then
+    __sm.log.warn "CPU counting for Solaris has not yet been implemented; returning 1."
+  # Warn that this function has not yet been implemented for bsd.
+  elif os is bsd
+  then
+    __sm.log.warn "CPU counting for BSD has not yet been implemented; returning 1."
+  # Warn that this function has not yet been implemented for aix.
+  elif os is aix
+  then
+    __sm.log.warn "CPU counting for AIX has not yet been implemented; returning 1."
+  fi
+
+  (( _cpu_count > 0 )) || _cpu_count=1 # Sanity Check
+
+  printf "%d" ${_cpu_count}
+}
+
+sm-parallel()
+{
+  local _before=() _current _sequential _sequence _parallel
+
+  # Find parallel or sequential definition
+  while (( $# > 0 ))
+  do
+    _current="$1"
+    shift
+    case "${_current}" in
+      */*|*,*)
+        _sequential=( ${_current//,/ } )
+        break
+        ;;
+      *)
+        _before+=( "${_current}" )
+        ;;
+    esac
+  done
+
+  # Run with the found definition
+  for _sequence in "${_sequential[@]}"
+  do
+    _parallel=( ${_sequence//\// } )
+    if (( ${#_parallel[@]} > 1 ))
+    then
+      "${sm_path}/bin/sm-ll" --noswap -j $(os cpu count) sm "${_before[@]}" {} "$@" ::: ${_parallel[@]}
+    else
+      "${sm_path}/bin/sm" "${_before[@]}" ${_parallel} "$@"
+    fi
+  done
+}
+
+case "$*" in
+  */*|*,*)
+    sm-parallel "$@"
+    ;;
+  *)
+    "${sm_path}/bin/sm" "$@"
+esac
+

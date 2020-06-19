@@ -1,0 +1,27 @@
+*.build
+*.tar.gz
+*.tar.xz
+*.dsc
+*.changes
+*.upload
+
+# ignore compiled python code
+__pycache__
+*.pyc
+
+#IntelliJ
+.idea
+*.iml
+
+#Setup
+MANIFEST
+build/
+dist/
+scudcloud.egg-info/
+
+#Deb
+.pybuild/
+debian/files
+debian/scudcloud/
+debian/scudcloud.*
+debian/debhelper-build-stamp

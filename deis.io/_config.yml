@@ -1,0 +1,66 @@
+name: Deis
+url: http://deis.io
+tagline: Your Paas. Your Rules.
+highlighter: rouge
+gems:
+  - jemoji
+  - jekyll-paginate
+markdown: kramdown
+redcarpet:
+  extensions: [ "no_intra_emphasis",
+                "fenced_code_blocks",
+                "autolink",
+                "tables",
+                "with_toc_data",
+                "strikethrough",
+                "space_after_headers",
+                "superscript"
+              ]
+timezone: America/Denver
+#permalink: /blog/:year/:month/:day/:title
+permalink: /:title
+paginate: 5
+paginate_path: "blog/page:num"
+excerpt_separator: "<!--more-->"
+exclude: ['README.md', 'Gemfile', 'Gemfile.lock', '.ruby-version']
+authors:
+  mboersma:
+    display_name: Matt Boersma
+    gravatar: d778494c1f994d6046a4289461bad99c
+    short_bio: Deis core maintainer and Software Engineer at Engine Yard
+    twitter: RealMattBoersma
+  bacongobbler:
+    display_name: Matt Fisher
+    gravatar: 65e1d16c6d56dd57fa47b30dcb429eed
+    short_bio: Deis core maintainer and Software Engineer at Engine Yard
+    twitter: bacongobbler
+  sgoings:
+    display_name: Seth Goings
+    gravatar: 2599e90d45538b0127c7df29918c33bd
+    short_bio: Deis DevTools Engineer and Software Engineer at Engine Yard
+    twitter: sethgoings
+  gabrtv:
+    display_name: Gabriel Monroy
+    gravatar: 1f5dd69ca86e92ce3bc039c63f511d40
+    short_bio: Deis BDFL and CTO at Engine Yard
+    twitter: gabrtv
+  bengrunfeld:
+    display_name: Ben Grunfeld
+    gravatar: 1f1cd2ad7176acf859cbbbed23554fc9
+    short_bio: Software Engineer and Front End Developer at OpDemand
+    twitter: bengrunfeld
+  carmstrong:
+    display_name: Chris Armstrong
+    gravatar: af504cb76d2ad9b45f6d0dbeab79a177
+    short_bio: Deis core maintainer and Deis Team Lead at Engine Yard
+    twitter: carmstrong_afk
+  smothiki:
+    display_name: Sivaram Mothiki
+    gravatar: fccb449e9feaad79ea2b385f8a3aa5c0
+    short_bio: Deis maintainer and Software Engineer at Engine Yard
+    twitter: smothiki
+  technosophos:
+    display_name: Matt Butcher
+    gravatar: c9eec3c9d165e463b05ea3d2b23d5ba3
+    short_bio: Deis core maintainer and Senior Software Engineer at Engine Yard
+    twitter: technosophos

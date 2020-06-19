@@ -1,0 +1,4 @@
+# vim swap files
+.*.sw*
+vim/.netrwhist
+bin/kube-aws

@@ -1,0 +1,39 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: steward-cf
+  namespace: steward
+  labels:
+    app: steward-cf
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: steward-cf
+    spec:
+      containers:
+      - name: steward-cf
+        image: #deploy_image#
+        imagePullPolicy: Always
+        env:
+        - name: LOG_LEVEL
+          value: trace
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          failureThreshold: 3
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          failureThreshold: 1
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2

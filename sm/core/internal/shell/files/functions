@@ -1,0 +1,515 @@
+#!/bin/sh
+
+__sm.files.source()
+{
+  typeset _file _files
+  _files=("$@")
+  (( $# )) && shift || __sm.log.fail "Cannot source files; No files were given."
+
+  for _file in "${_files[@]}"
+  do
+    _file=${_file/\~\//$HOME\/} # Expand ~/ to full value of $HOME
+
+    if [[ -f  "${_file}" && -s  "${_file}" ]]
+    then
+      bash -n "${_file}" ||
+        __sm.log.fail "Cannot source the file '${_file}'; Invalid syntax."
+
+      source "${_file}" ||
+        __sm.log.fail "There was an error sourcing the file '${_file}'."
+    fi
+  done
+}
+
+__sm.files.nonempty()
+{
+  typeset _file
+
+  for _file in "$@"
+  do
+    _file=${_file/\~\//$HOME\/} # Expand ~/ to full value of $HOME
+    if [[ -s "${_file}" ]]
+    then
+      printf "${_file}\n"
+    fi
+  done
+}
+
+__sm.files.empty()
+{
+  typeset _file
+
+  for _file in "$@"
+  do
+    _file=${_file/\~\//$HOME\/} # Expand ~/ to full value of $HOME
+    if [[ -f "${_file}" && ! -s "${_file}" ]]
+    then
+      printf "${_file}\n"
+    fi
+  done
+}
+
+__sm.files.remove()
+{
+  # TODO: add 'from' parameter
+  typeset _file _files
+  _files=("$@")
+  (( $# )) && shift || __sm.log.fail "Cannot remove files, as no files were given to remove."
+
+  for _file in "${_files[@]}"
+  do
+    if [[ -f "${_file}" || -L "${_file}" ]]
+    then
+      rm -f "${_file}"
+
+    elif [[ -d "${_file}" ]]
+    then
+      __sm.log.fail "Cannot remove the file ${_file}, as it is a directory."
+
+    elif [[ -e "${_file}" ]]
+    then
+      __sm.log.fail "Failed to remove the file from the filesystem, "\
+        "as the file exists as an unknown/unhandled filesystem entity type:"\
+        "$(file "${_file}")."
+    else
+      return 0
+    fi
+  done
+}
+
+__sm.files.create()
+{
+  trace_filter filesystem || set -o xtrace
+  typeset _file _path _files
+  _files=("$@")
+  (( $# )) && shift || __sm.log.fail "Cannot ensure files exist; No files were given."
+
+  for _file in "${_files[@]}"
+  do
+    if [[ -f "${_file}" ]]
+    then
+      continue # Already exists, move along.
+    fi
+    _path="${_file%\/*}"
+    paths create "${_path}"
+    touch "${_file}" || __sm.log.fail "Error creating the file '${_file}'; "\
+      " touch command returned error code '$?'."
+  done
+}
+
+__sm.files.link()
+{
+  typeset _source _target _flags _path
+  _source="$1"
+  _target="$2"
+  _flags=(${=3})
+
+  _path="${_target%\/*}"
+  if [[ -n "${_path}" ]]
+  then
+    [[ -d "${_path}" ]] || mkdir -p "${_path}"
+  fi
+
+  ln ${_flags[@]} "${_source}" "${_target}" ||
+    __sm.log.fail "Failed to create a symbolic link from '${_source}' to '${_target}';"\
+    "'ln -fs' command failed with error code '$?'."
+}
+
+__sm.files.move()
+{
+  typeset _source _target _flags _file _files
+  _source="$1"
+  _target="$2"
+  _flags=( ${=3} )
+  shift 3
+  _files=("$@")
+
+  if (( ${#_files} ))
+  then
+    for _file in "${_files[@]}"
+    do
+      mv ${_flags[@]} "${_source}/${_file}" "${_target}/${_file}" ||
+        __sm.log.fail "There was an error ($?) moving the source '${_source}/${_file}'" \
+        "to the target '${_target}/${_file}'."
+    done
+  else # moving single file
+    mv ${_flags[@]} "${_source}" "${_target}" ||
+      __sm.log.fail "There was an error ($?) moving the source '${_source}'" \
+      "to the target '${_target}'."
+  fi
+}
+
+__sm.files.copy()
+{
+  typeset _source _target _flags _file _files
+  _source="$1"
+  _target="$2"
+  _flags=( ${=3} )
+  shift 3
+  _files=("$@")
+
+  if [[ -n "${_files[*]}" ]]
+  then
+    for _file in "${_files[@]}"
+    do
+      cp ${_flags[@]} "${_source}/${_file}" "${_target}/${_file}" ||
+        __sm.log.fail "There was an error ($?) moving the source '${_source}/${_file}'" \
+        "to the target '${_target}/${_file}'."
+    done
+  else # moving single file
+    cp ${_flags[@]} "${_source}" "${_target}" ||
+      __sm.log.fail "There was an error ($?) moving the source '${_source}'" \
+      "to the target '${_target}'."
+  fi
+}
+
+__sm.files.chown()
+{
+  typeset _owner _flags _file _files
+  _owner="$1"
+  _flags=(${=2})
+  shift 2
+  _files=("$@")
+  chown ${_flags[@]} "${_owner}" "${_files[@]}" ||
+    __sm.log.fail "There was an error ($?) chowning"\
+    " files '${_files[@]}' owner to '${_owner}'."
+}
+
+__sm.files.chmod()
+{
+  typeset _mode _flags _file _files
+  _mode="$1"
+  _flags=( ${=2} )
+  shift 2
+  _files=("$@")
+
+  if ! chmod ${_flags[@]} ${_mode} "${_files[@]}"
+  then
+    __sm.log.fail "There was an error ($?) chmodding"\
+      " files '${_files[*]}' owner to '${_owner}'."
+  fi
+}
+
+__sm.files.exist()
+{
+  [[ -f "$1" ]]
+}
+
+__sm.files.exists()
+{
+  typeset _file
+  for _file in "$@"
+  do
+    [[ -f "${_file}" ]] || return 1
+  done
+  return 0
+}
+
+__sm.files.contain()
+{
+  typeset _string _regex _file
+  _string="$1"
+  _regex="$2"
+  shift 2
+
+  for _file in $@
+  do
+    [[ -f "${_file}" ]] || return 1
+  done
+
+  if [[ -n "${_regex}" ]]
+  then
+    for _file in "${_files[@]}"
+    do
+      grep "${_regex}" "${_file}" >/dev/null 2>&1 || return 1
+    done
+  else
+    for _file in "${_files[@]}"
+    do
+      grep "${_string}" "${_file}" >/dev/null 2>&1 || return 1
+    done
+  fi
+}
+
+__sm.files.containing()
+{
+  typeset _string _regex _file _files
+  _string="$1"
+  _regex="$2"
+  shift 2
+  _files=("$@")
+
+  [[ -f "${_file}" ]] || __sm.log.fail "'${_file}' is not a file."
+
+  if [[ -n "${_regex}" ]]
+  then
+    for _file in "${_files[@]}"
+    do
+      if grep "${_regex}" "${_file}" >/dev/null 2>&1
+      then
+        echo "${_file}"
+      fi
+    done
+  else
+    for file in "${_files[@]}"
+    do
+      if grep "${_string}" "${_file}" >/dev/null 2>&1
+      then
+        echo "${_file}"
+      fi
+    done
+  fi
+}
+
+__sm.files.are.empty()
+{
+  typeset _file
+  for _file in "$@"
+  do
+    _file=${_file/\~\//$HOME\/} # Expand ~/ to full value of $HOME
+    if ! [[ -f "${_file}" && ! -s "${_file}" ]]
+    then
+      return 1
+    fi
+  done
+  return 0
+}
+
+__sm.files.are.nonempty()
+{
+  typeset _file
+  for _file in "$@"
+  do
+    _file=${_file/\~\//$HOME\/} # Expand ~/ to full value of $HOME
+    if ! [[ -f "${_file}" && -s "${_file}" ]]
+    then
+      return 1
+    fi
+  done
+  return 0
+}
+
+__sm.files.are.executable()
+{
+  typeset _file
+  for _file in "$@"
+  do
+    [[ -r "${_file}" && -x "${_file}" ]] || return 1
+  done
+}
+
+__sm.files.are.missing()
+{
+  typeset _file
+  for _file in "$@"
+  do
+    if [[ -f "${_file}" ]]
+    then
+      return 1
+    fi
+  done
+  return 0
+}
+
+__sm.files.are.symlinks()
+{
+  typeset _file
+  for _file in "$@"
+  do
+    [[ -L "${_file}" ]] || return 1
+  done
+}
+
+__sm.files.sha()
+{
+  typeset _sum _sums _files _number
+  _number=$1
+  shift
+  _files=("$@")
+  _sums=( $(shasum -a ${_number} "${_files[@]}") )
+  for _sum in "${_sums[@]}"
+  do
+    echo "${_sum// *}"
+  done
+}
+
+__sm.files.sha.256()
+{
+  __sm.files.sha 256 "$@"
+}
+__sm.files.sha.512()
+{
+  __sm.files.sha 512 "$@"
+}
+
+__sm.files.write()
+{
+  typeset _string _target _flags _user
+  _string="$1"
+  _target="$2"
+  _flags=( ${=3} )
+  if [[ -n "$4" ]]
+  then
+    _user="sudo -u $4"
+  fi
+  printf "${_string}\n" | ${=_user} tee ${_flags[@]} "${_target}" >/dev/null
+}
+
+__sm.files.in()
+{
+  typeset _path _file
+  for _path in "$@"
+  do
+    [[ -d "${_path}" ]] || __sm.log.fail "'${_path}' is not a valid path! "
+    for _file in "${_path}"/*
+    do
+      [[ -f "${_file}" ]] || continue
+      echo "${_file}"
+    done
+  done
+}
+
+__sm.files.within()
+{
+  typeset _path _entry
+  for _path in "$@"
+  do
+    [[ -d "${_path}" ]] || __sm.log.fail "'${_path}' is not a directory!"
+    for _entry in "${_path}"/*
+    do
+      if [[ -d "${_entry}" ]]
+      then
+        __sm.files.within "${_entry}"
+      else
+        if [[ -f "${_entry}" || -L "${_entry}" ]]
+        then
+          echo "${_entry}"
+        fi
+      fi
+    done
+  done
+}
+
+__sm.files.within.matching()
+{
+  typeset _string _regex _file _path
+  _string="$1"
+  _regex="$2"
+  shift 2
+  for _path in "$@"
+  do
+    for _file in "${_path}"/*
+    do
+      if [[ -d "${_file}" ]]
+      then
+        __sm.files.within.matching "${_string}" "${_regex}" "${_file}"
+      else
+        if [[ -n "${_regex}" ]]
+        then
+          if [[ "${_file}" == ${_regex} ]]
+          then
+            echo "${_file}"
+          fi
+        else
+          if [[ "${_file}" == ${_string} ]]
+          then
+            echo "${_file}"
+          fi
+        fi
+      fi
+    done
+  done
+}
+
+__sm.files.md5()
+{
+  typeset _file _command _md5
+
+  if __sm.command.exists "md5sum"
+  then
+    _command="md5sum"
+  elif __sm.command.exists md5
+  then
+    _command="md5"
+  else
+    __sm.log.error "Could not find a suitable MD5 command (md5/md5sum) in PATH."
+  fi
+
+  for _file in "$@"
+  do
+    [[ -r "${_file}" ]] || continue
+
+    _md5="$(${_command} "$_file" 2>/dev/null || true)"
+
+    if [[ -n "${_md5}" ]]
+    then
+      printf "${_md5// *}"
+    else # Should this be error ?
+      __sm.log.warn "There was an unknown error computing the MD5 value of "${_file}"."
+      return 1
+    fi
+  done
+}
+
+__sm.files.replace()
+{
+  typeset _string _regex _file
+  _string="$1"
+  _regex="$2"
+  shift 2
+
+  for _file in "$@"
+  do
+    sed "s#${_regex//\#/\\#}#${_string//\#/\\#}#g" "${_file}" > "${_file}.replaced"
+    mv "${_file}.replaced" "${_file}"
+  done
+}
+
+__sm.files.open()
+{
+  os open "$@"
+}
+
+__sm.files.absolute.path()
+{
+  #TODO is it possible to replace it with ${1:A} ???
+  typeset _path _paths _recorded_path _amount _index _file_name
+  _paths=( "$@" )
+  _amount=$#
+  _recorded_path=$PWD
+
+  for (( _index=1 ; _index <= _amount ; _index++ ))
+  do
+    _path=${_paths[_index]}
+
+    if (( _index == _amount -1 ))
+    then
+      _file_name=$( basename ${_path} )
+      _path=$( dirname ${_path} )
+    fi
+
+    if [[ -d "${_path}" ]]
+    then
+      builtin cd "${_path}"
+    else
+      __sm.log.error "The given path '${_path}' is not a valid directory in the following list '$@'."
+    fi
+  done
+
+  printf "$( pwd )/${_file_name}\n"
+
+  builtin cd "${_recorded_path}"
+}
+
+__sm.files.touch()
+{
+  typeset _file
+
+  for _file in "$@"
+  do
+    _file=${_file/\~\//$HOME\/} # Expand ~/ to full value of $HOME
+    touch "${_file}"
+  done
+  return 0
+}
+

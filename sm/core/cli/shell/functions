@@ -1,0 +1,85 @@
+#!/bin/sh
+
+#TODO: this code should be distributed to proper places
+extension_cli()
+{
+  typeset _ignored_args _string _token number_of_args
+  _ignored_args=()
+
+  number_of_args=${#extension_args[@]}
+
+  for (( index=1 ; index <= $number_of_args ; index++ ))
+  do
+    _token="${extension_args[$index]}"
+    case "${_token}" in
+      (--uri|--url)
+        extension_uri="${extension_args[$((++index))]}"
+        ;;
+      (--version)
+        extension_version="${extension_args[$((++index))]}"
+        ;;
+      (--archive_format)
+        archive_format="${extension_args[$((++index))]}"
+        ;;
+      (--licence)
+        __sm.includes api/extensions/manipulation
+        extension_license
+        exit 0
+        ;;
+      (--modules)
+        _string="${extension_args[$((++index))]}"
+        extension_modules=(${_string//,/ })
+        ;;
+      (*)
+        _ignored_args+=("${_token}")
+        ;;
+    esac
+  done
+
+  extension_args=( "${_ignored_args[@]}" )
+}
+
+#
+# actions maps build {paths...}
+# actions maps lookup {command}
+#
+actions()
+{
+  typeset _action _token
+  _action="$1"
+  (( $# )) && shift || __sm.log.fail "Actions command not given."
+
+  while (( $# ))
+  do
+    _token="$1" && shift
+    case "${_token}" in
+      (maps)
+        _token="$1" && shift
+        case "${_token}" in
+          (build)
+            __sm.actions.maps.build "$@"
+            ;;
+          (search)
+            ;;
+          (*)
+            __sm.log.fail "Unknown command maps '${_token}'"
+            ;;
+        esac
+      (*)
+        __sm.log.fail "Unknown command '${_token}'"
+        ;;
+    esac
+  done
+}
+
+__sm.actions.maps.build()
+{
+  NIY
+  typeset _path _extensions
+  for _path in "$@"
+  do
+    _extensions=()
+  done
+}
+
+

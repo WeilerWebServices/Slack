@@ -1,0 +1,149 @@
+#!/bin/sh
+
+__sm.templates.find()
+{
+  typeset -g template_path template_name
+  typeset _extensions_path _extension _template_path _params_path
+  _extensions_path="$1"
+
+  (( $# )) && shift || __sm.log.fail "No extensions path and extension name given."
+
+  _params_path="$*"
+  _params_path="${_params_path// //}"
+  _extension="${_params_path%%/*}"
+  _params_path="${_params_path#*/}"
+  _template_path="${_extensions_path}/${_extension}/templates/${_params_path}"
+
+  if [[ -f "${_template_path}.template" ]]
+  then
+    template_path="${_template_path}.template"
+    template_name="${_extension}/${_params_path}"
+    return 0
+  elif [[ -f "${_template_path}.mustache" ]]
+  then
+    template_path="${_template_path}.mustache"
+    template_name="${_extension}/${_params_path}"
+    return 0
+  elif [[ -f "${_template_path}" ]]
+  then
+    template_path="${_template_path}"
+    template_name="${_extension}/${_params_path}"
+    return 0
+  fi
+  return 1
+}
+
+__sm.templates.exist()
+{
+  if __sm.extension.in.paths __sm.templates.find "$@" ||
+    __sm.cli.in.path __sm.templates.find "$@"
+  then
+    __sm.log.search "template" "$template_name" "${template_path##${sm_path}\/}"
+    return 0
+  else
+    return 1
+  fi
+}
+
+# ### Code Walkthrough
+__sm.templates.install()
+{
+  __sm.templates.exist "${_name}" || __sm.log.fail "No template found matching '${_name}'."
+
+  _template="${template_path}"
+  _name="$(basename "${_name}")"
+
+  paths create "$(dirname "${_target}")"
+
+  if paths exist "${_target}"
+  then
+    if paths exist "${_target}/${_name}"
+    then
+      __sm.log.fail "Cannot install the template '${_template}' to ${_target}/${_name},"\
+        " as it is a directory."
+    fi
+    files copy \
+      from "${_template}" to "${_target}/${_name}" \
+      mode "${_mode}" owner "${_owner}"
+  else
+    files copy force \
+      from "${_template}" to "${_target}" \
+      mode "${_mode}" owner "${_owner}"
+  fi
+}
+
+__sm.templates.seed()
+{
+  typeset _template _hash _strings temporary
+  _template="${1:-}"
+  (( $# )) && shift || __sm.log.fail "No template name was given."
+  _hash=("$@")
+  _strings=()
+  temporary=${_template}.${timestamp}.$$
+
+  if ! files exist "${_template}"
+  then
+    __sm.log.fail "template file '${_template}' does not exist."
+  fi
+
+  [[ -n "${_hash}" ]] || __sm.log.fail "Cannot seed template '${_template}';"\
+    " No replacement keys were specified."
+
+  array is even _hash || __sm.log.fail "Cannot seed template;"\
+    " Every replacement key must have a replacement value."
+
+  for (( index=1 ; index <= ${#_hash[@]} ; index++ ))
+  do
+    _strings+=(-e "s#{{${_hash[${index}]}}}#${_hash[$((++index))]}#g")
+  done
+
+  sed "${_strings[@]}" ${_template} > ${temporary} ||
+    __sm.log.error "There was an error (?) seeding the template '${_template}';" \
+    " Most often this is due to filesystem permissions / disk full."
+
+  if ! files exist "${temporary}"
+  then
+    __sm.log.fail "Something went very wrong;"\
+      " the template intermediate file '${temporary}' does not exist?! "
+  fi
+
+  files move from "${temporary}" to "${_template}"
+}
+
+__sm.templates.update()
+{
+  typeset _template _target _incoming _hash _strings _variables
+  _template="${1:-}"
+  _target="${2:-}"
+  (( $# )) && shift || __sm.log.fail "Cannot update seed template;"\
+    " Template name was not given as the first parameter."
+  (( $# )) && shift || __sm.log.fail "Cannot update seed template;"\
+    " Template target was not given as the second parameter."
+
+  _incoming="${1:-${_target}.incoming}"
+  (( $# )) && shift || true
+  _hash=("$@")
+  _strings=()
+  _variables="${_target}.var.$$"
+
+  __sm.templates.exist "${_template}" || __sm.log.fail "Cannot update seed template;"\
+    " No template was found matching '${_name}'."
+
+  _template="${template_path}"
+
+  for (( index=1 ; index <= ${#_hash[@]} ; index++ ))
+  do
+    _strings+=(-e "s#{{${_hash[${index}]}}}#${_hash[$((++index))]}#g")
+  done
+
+  sed "${_strings[@]}" ${_template} | grep -E '^[^#]+=' > "${_variables}"
+
+  diff -wN --left-column \
+    <( grep -Eo '(^[^#]+=)' "${_target}" 2>/dev/null | sed 's/export //' | sort ) \
+    <( grep -Eo '(^[^#]+=)' "${_variables}" | sed 's/export //' | sort ) | \
+    awk -F '> ' '/^>/ {print$2}' | \
+    xargs -n 1 | \
+    xargs -I {} grep "^[^#]*{}" "${_variables}" > "${_incoming}"
+
+  rm "${_variables}"
+}

@@ -1,0 +1,125 @@
+#!/bin/sh
+#
+# In order to use the sm interactive project functions, the project module's
+# interactive file must be sourced in your profile, such as ~/.bash_profile,
+#
+# The following example sources the file only if it exists and is nonempty:
+#
+# if [[ -s /opt/sm/core/api/shell/project/interactive ]]
+# then
+#   . /opt/sm/core/api/shell/project/interactive
+# fi
+#
+true "${project_search_maxdepth:="3"}"
+true "${projects_path:="$HOME/projects"}"
+export projects_path
+
+# ## p() -- Project
+#
+# Project function.
+#
+# cd into the first directory which matches the parameters passed in.
+#
+# Examples:
+#
+# user ~ $ p sm core
+# user ~/projects/sm/core $
+#
+# Partial prefix completion is also supported,
+# user ~ $ p bd e
+# user ~/projects/sm/extensions $
+#
+p()
+{
+  typeset _path _regex1 _regex2
+  _regex1="${1:-}"
+  _regex2="${2:-}"
+  true "${projects_path:="$HOME/projects"}"
+
+  if [[ -z "${_regex1}" ]]
+  then
+    cd "${projects_path}"
+    return 0
+  fi
+
+  if [[ -n "${BASH_VERSION}" && "$PS4" == "+ " ]]
+  then
+    PS4="+ \${BASH_SOURCE##\${sm_path}} \${FUNCNAME[0]:+\${FUNCNAME[0]}()} \${LINENO} > "
+  elif [[ -n "${ZSH_VERSION}" ]]
+  then
+    PS4="+%x:%I %N():%i > "
+  fi
+  export PS4
+
+  if [[ -n "${regex1}" ]]
+  then
+    # TODO: add concept of depth to paths search.
+    _paths=$( paths search in "${projects_path}" matching "${_regex1}*" )
+    #_paths=$(
+    #find "$projects_path" -mindepth 1 -maxdepth ${project_search_maxdepth} -iname "${regex1}*" -type d |
+    #head -1
+    #)
+    if (( "${#_paths}" == 0 ))
+    then
+      echo "No paths found matching ${_regex1}"
+      return 1
+    elif (( "${#_paths}" > 1 ))
+    then
+      echo "More than one prefix path found matching, please choose one:"
+      _path="${_paths}" # TODO: select
+    fi
+
+    cd "${_path}"
+
+    if [[ -n "${regex2}" ]]
+    then
+      _paths=$( paths search in "${projects_path}" matching "${_regex2}*" )
+      #_path=$(
+      #find "$_path" -mindepth 1 -maxdepth ${project_search_maxdepth} -iname "${regex2}*" -type d |
+      #head -1
+      #)
+
+      if (( "${#_paths}" == 0 ))
+      then
+        echo "No paths found matching ${_regex1}"
+        return 1
+      elif (( "${#_paths}" > 1 ))
+      then
+        echo "More than one prefix path found matching, please choose one:"
+        _path="${_paths}" # TODO: select
+      fi
+
+      cd "${_path}"
+    fi
+  else
+    echo "A project name or directory must be specified as the first parameter.";
+  fi
+}
+
+# ## pe() -- Project Edit
+#
+# Changes directory to a project based on the parameters passed into the
+# function, then launches the editor on the given directory.
+#
+pe()
+{
+  # Project edit function;
+  # use the project switch function in addition to launching the editor.
+  p $*
+  ${EDITOR:-vim} .
+}
+
+#
+# ## po() -- Project Open
+#
+# Changes directory to a project based on the parameters passed into the
+# function, and then opens the given directory in the operating system.
+#
+po()
+{
+  # Project open function; use the project switch function in addition to
+  # opening the filesystem directory.
+  p $*
+  os open
+}
+

@@ -1,0 +1,44 @@
+#!/bin/sh
+
+#
+# SM shell API
+#
+# shell is interactive
+#
+#
+shell()
+{
+  typeset _token
+  while (( $# ))
+  do
+    _token="$1" && shift
+    case "${_token}" in
+      (is)
+        _command=is
+        _subcommand="${1}"
+        (( $# )) && shift || __sm.log.fail "A command must follow keyword 'is'"
+        case "${_subcommand}" in
+          (interactive)
+            [[ -t 0 ]]
+            ;;
+          (*)
+            __sm.log.fail "Unknown command following keyword 'is'; shell is <interactive>"
+            ;;
+        esac
+        ;;
+      (*)
+        [[ -z "${_command}" ]]
+        ;;
+    esac
+  done
+
+}
+
+if shell is interactive
+then
+  # Interactive functions will be loaded here, only if shell is interactive.
+  # TODO: Add interactive functionality + interactive sm hooks loading for each
+  # module
+  true
+fi
+

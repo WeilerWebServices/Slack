@@ -1,0 +1,20 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: aks-keepalive
+spec:
+  template:
+    metadata:
+      labels:
+        app: aks-keepalive
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
+      containers:
+      - name: keepalive
+        image: jhansen/aks-keepalive:v0.1.0
+        imagePullPolicy: Always
+        command: ["/configure"]
+        securityContext:
+          privileged: true

@@ -1,0 +1,142 @@
+" vim ftw
+set nocompatible
+
+" pathogen.vim ftw
+filetype off
+call pathogen#incubate()
+call pathogen#helptags()
+execute pathogen#infect()
+
+set modelines=10
+
+" set the title in xterm
+set title
+
+" better buffer management
+set hidden
+
+" fixup backspace behavior
+set backspace=indent,eol,start
+
+let mapleader = ","
+set history=1000
+
+" Automatically reload files
+set autoread
+
+" searching stuff
+set hlsearch
+set incsearch
+set showmatch
+
+" Make <C-L> clear highlight and redraw
+nnoremap <C-L> :nohls<CR><C-L>
+inoremap <C-L> <C-O>:nohls<CR>
+
+" ignore case only if there are no upcase letters in the search
+set ignorecase
+set smartcase
+
+" <tab> completion for filenames
+set wildmenu
+set wildmode=full
+set complete-=i
+set wildignore+=*/.git/*,*/.hg/*,*/.svn/*
+
+" turn syntax highlighting on
+syntax on
+
+let g:syntastic_yaml_checkers = ['yamllint']
+
+" 256 colors, colorscheme
+set t_Co=256
+colorscheme solarized
+set background=dark
+
+set vb t_vb=
+
+filetype plugin indent on
+set ruler
+set smarttab
+set cursorline
+
+"autocmd FileType *    set tabstop=8|set shiftwidth=8|set noexpandtab|set autoindent
+autocmd FileType ruby,haml set tabstop=2|set shiftwidth=2|set expandtab|set autoindent
+autocmd FileType go   set nolist|set tabstop=8|set shiftwidth=8|set noexpandtab
+autocmd FileType yaml setlocal indentexpr=
+
+" Trailling spaces and tabs
+set list
+set listchars=tab:>-,trail:·,nbsp:·
+
+set fileformat=unix
+set nobackup
+
+" Status Line
+set statusline=%<%f\ (%{&ft})\ %-4(%m%)%=%-19(%3l,%02c%03V%)\ %{fugitive#statusline()}
+set laststatus=2
+
+" NERDTree
+map <leader>ntt :NERDTreeToggle<CR>
+map <leader>ntf :NERDTreeFind<CR>
+map <leader>ntm :NERDTreeMirror<CR>
+let NERDTreeAutoDeleteBuffer=1
+
+" BufExplorer
+let g:bufExplorerFindActive=0
+
+" Ctrl-P
+let g:ctrlp_match_window_reversed = 0
+let g:ctrlp_map = '<leader>f'
+map <leader>fb :CtrlPBuffer<CR>
+map <leader>fc :CtrlP app/controllers<CR>
+map <leader>fl :CtrlP lib<CR>
+map <leader>fm :CtrlP app/models<CR>
+map <leader>fv :CtrlP app/views<CR>
+map <leader>fs :CtrlP spec<CR>
+map <leader>ff :CtrlP<CR>
+map <leader>cf :ClearCtrlPCache<CR>
+map <leader>ct :CtrlPTag<CR>
+
+map <leader>o :cd ~/p/
+map <leader>gg :topleft 100 :split Gemfile<CR>
+map <leader>go :cd ~/p/go/src/
+map <leader>gh :cd ~/p/go/src/github.com/
+
+" Align bindings
+" Note: :AlignMapsClean removes default maps
+map <leader>a= :Align =<CR>
+map <leader>ah :Align =><CR>
+
+" Set minimum window height
+set winheight=10
+
+" ctags stuff
+set tags=./tags,tags,./TAGS,TAGS
+
+" numbers
+set number
+
+" gui stuff
+set guioptions-=T
+set guioptions-=r
+set guioptions-=L
+
+" grep
+map <leader>a :Ack!<space>
+map <leader>a* :Ack!<space><cword><CR>
+let g:ackprg = 'ag --vimgrep'
+set grepprg=ack
+set grepformat=%f:%l:%m
+
+" backup files
+set backupdir=~/.vim/backup
+set directory=~/.vim/backup
+
+" ruby
+map <leader>rs :!ruby -c %:p<CR>
+map <leader>r19 :s/\v:([0-9a-z_]+)\s+\=\>\s+/\1: /g<CR>
+map <leader>r18 :s/\v([0-9a-z_"']+):\s+(.*)/:\1 => \2/g<CR>
+
+" Save files when vim loses focus
+au FocusLost * :wa

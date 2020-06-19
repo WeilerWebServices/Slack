@@ -1,0 +1,128 @@
+## .bashrc for non-login shells
+
+PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
+
+# Aliases
+if [[ -s "$HOME/.aliases" ]]; then
+  # shellcheck source=/dev/null
+  source "$HOME/.aliases"
+fi
+
+## Completions
+if [[ -f /usr/local/share/bash-completion/bash_completion ]]; then
+  . /usr/local/share/bash-completion/bash_completion
+  if [[ -d "/usr/local/etc/bash_completion.d" ]] ; then
+    for f in /usr/local/etc/bash_completion.d/*; do
+      if [[ -f $f ]]; then
+        # shellcheck source=/dev/null
+        source $f
+      fi
+    done
+  fi
+  if [[ -f ~/.bash_completion ]]; then
+    . ~/.bash_completion
+  fi
+fi
+
+## Ruby
+if [[ -d "/usr/local/share/chruby" ]] ; then
+  source /usr/local/share/chruby/chruby.sh
+  source /usr/local/share/chruby/auto.sh
+fi
+
+export RUBY_FREE_MIN=200000
+export RUBY_GC_HEAP_FREE_SLOTS=200000
+export RUBY_GC_MALLOC_LIMIT=60000000
+
+# Java
+if [[ -e "/usr/libexec/java_home" ]] ; then
+  export JAVA_HOME=$(/usr/libexec/java_home)
+  export PATH=$JAVA_HOME:$PATH
+fi
+
+# Go
+[[ -s "${HOME}/.gvm/scripts/gvm" ]] && source "${HOME}/.gvm/scripts/gvm"
+
+if [[ -d "$HOME/p/go" ]]; then
+  export GOPATH="$HOME/p/go"
+  export PATH=$GOPATH/bin:$PATH
+  export GO15VENDOREXPERIMENT=1
+fi
+
+if [[ -d "$HOME/go" ]]; then
+  export GOPATH="$HOME/go"
+  export PATH=$GOPATH/bin:$PATH
+fi
+
+if [[ -d "$HOME/.krew/bin" ]]; then
+  export PATH=${HOME}/.krew/bin:$PATH
+fi
+
+## Editor
+export EDITOR=vim
+
+if [[ $OSTYPE == 'linux-gnu' ]]; then
+  alias ls='ls -p --color=auto'
+elif [[ $OSTYPE =~ darwin* ]]; then
+  alias ls='ls -Gp'
+fi
+
+## Functions
+function gogo() { cd "$GOPATH/src/$*" || return; }
+function gogh() { cd "$GOPATH/src/github.com/$*" || return; }
+
+function git-work() {
+  git config user.name "Jason Hansen"
+  git config user.email "Jason.Hansen@microsoft.com"
+  git config user.signingkey 80245F0F85EBC14E08457BAE5671CD6252A61A10
+  git config commit.gpgsign true
+}
+
+function git-personal() {
+  git config user.name "Jason Hansen"
+  git config user.email "jason@slack.io"
+  git config user.signingkey EE55CC408FBBAC76EAD0B3DD13DE565EA45DF0A8
+  git config commit.gpgsign true
+}
+
+if [[ -d "$HOME/.env.d" ]] ; then
+  for f in $HOME/.env.d/*.bash; do
+    # shellcheck source=/dev/null
+    source "$f"
+  done
+fi
+
+## Prompt
+function env_targets {
+if [[ ( -n ${KUBE_TARGET}) || ( -n ${DEIS_PROFILE}) ]]; then
+  echo -n "[$(kube_target)] "
+fi
+}
+
+function kube_target {
+  if [[ -n ${KUBE_TARGET} ]]; then
+    sep=""
+    if [[ -n ${DEIS_PROFILE} ]]; then
+      sep="|"
+    fi
+    echo -n "⎈ →${KUBE_TARGET}${sep}"
+  fi
+}
+
+function workflow_target {
+  if [[ -n ${DEIS_PROFILE} ]]; then
+    echo -n "w→${DEIS_PROFILE}"
+  fi
+}
+
+if [[ -n "${SSH_CONNECTION+x}" ]]; then
+  export PS1="\$(env_targets)\H:\W \$(parse_git_branch)\$ "
+else
+  export PS1="\$(env_targets)\W \$(parse_git_branch)\$ "
+fi
+
+if [ -f "/usr/local/opt/bash-git-prompt/share/gitprompt.sh" ]; then
+  GIT_PROMPT_THEME_NAME="Custom"
+  __GIT_PROMPT_DIR="/usr/local/opt/bash-git-prompt/share"
+  source "/usr/local/opt/bash-git-prompt/share/gitprompt.sh"
+fi

@@ -1,0 +1,221 @@
+#!/bin/sh
+
+DIR=$(dirname "$(readlink -f "$0")")
+JQ="/usr/bin/jq"
+LOG="/var/log/kv-driver.log"
+VER="0.0.10"
+KVFV="${DIR}/azurekeyvault-flexvolume"
+
+usage() {
+	err "Invalid usage. Usage: "
+	err "\t$0 init"
+	err "\t$0 mount <mount dir> <json params>"
+	err "\t$0 unmount <mount dir>"
+	exit 1
+}
+
+err() {
+	echo `date` "ERROR:" $* >> $LOG
+	echo $* 1>&2
+}
+
+log() {
+	echo `date` "INFO:" $* >> $LOG
+	echo $* >&1
+}
+ismounted() {
+	MOUNT=`findmnt -n ${MNTPATH}`
+	if [ ! -z "$MOUNT" ]
+	then
+        echo "`date` ismounted | mounted" >> $LOG
+		echo "1"
+	else
+        echo "`date` ismounted | not mounted" >> $LOG
+		echo "0"
+	fi
+}
+
+mount() {
+	MNTPATH="$1"
+
+	CLIENTID="$(echo "$2"|"$JQ" -r '.["kubernetes.io/secret/clientid"] // empty' | base64 -d)"
+	CLIENTSECRET="$(echo "$2"|"$JQ" -r '.["kubernetes.io/secret/clientsecret"] // empty' | tr -d '\n' | tr -d ' ' | base64 -d)"
+
+	PODNAMESPACE="$(echo "$2"|"$JQ" -r '.["kubernetes.io/pod.namespace"] // empty')"
+	PODNAME="$(echo "$2"|"$JQ" -r '.["kubernetes.io/pod.name"] // empty')"
+
+	# Required
+	RESOURCE_GROUP="$(echo "$2"|"$JQ" -r '.resourcegroup //empty')"
+	SUBSCRIPTION_ID="$(echo "$2"|"$JQ" -r '.subscriptionid //empty')"
+	TENANT_ID="$(echo "$2"|"$JQ" -r '.tenantid //empty')"
+	KEYVAULT_NAME="$(echo "$2"|"$JQ" -r '.keyvaultname //empty')"
+	KEYVAULT_OBJECT_NAMES="$(echo "$2"|"$JQ" -r '.keyvaultobjectnames //empty')"
+	KEYVAULT_OBJECT_TYPES="$(echo "$2"|"$JQ" -r '.keyvaultobjecttypes //empty')"
+	
+	USE_POD_IDENTITY="$(echo "$2"|"$JQ" -r '.usepodidentity //empty')"
+
+	# Optional
+	CLOUD_NAME="$(echo "$2"|"$JQ" -r '.cloudname //empty')"
+	KEYVAULT_OBJECT_VERSIONS="$(echo "$2"|"$JQ" -r '.keyvaultobjectversions //empty')"
+	KEYVAULT_OBJECT_ALIASES="$(echo "$2"|"$JQ" -r '.keyvaultobjectaliases //empty')"
+	
+    # backward compatibility (should be deprecated!)
+	if [ -z "${KEYVAULT_OBJECT_NAMES}" ]; then
+		KEYVAULT_OBJECT_NAMES="$(echo "$2"|"$JQ" -r '.keyvaultobjectname //empty')"
+		KEYVAULT_OBJECT_TYPES="$(echo "$2"|"$JQ" -r '.keyvaultobjecttype //empty')"
+		KEYVAULT_OBJECT_VERSIONS="$(echo "$2"|"$JQ" -r '.keyvaultobjectversion //empty')"
+
+	fi
+
+	if [ $(ismounted) -eq 1 ] ; then
+		log "{\"status\": \"Success\"}"
+		exit 0
+	fi
+
+	# validate
+	if [ -z "${RESOURCE_GROUP}" ]; then
+		err "{\"status\": \"Failure\", \"message\": \"validation failed, resourcegroup is empty\"}"
+		exit 1
+	fi
+
+	if [ -z "${SUBSCRIPTION_ID}" ]; then
+		err "{\"status\": \"Failure\", \"message\": \"validation failed, subscriptionid is empty\"}"
+		exit 1
+	fi
+
+	if [ -z "${TENANT_ID}" ]; then
+		err "{\"status\": \"Failure\", \"message\": \"validation failed, tenantid is empty\"}"
+		exit 1
+	fi
+
+	if [ -z "${KEYVAULT_NAME}" ]; then
+		err "{\"status\": \"Failure\", \"message\": \"validation failed, keyvaultname is empty\"}"
+		exit 1
+	fi
+
+	if [ -z "${KEYVAULT_OBJECT_NAMES}" ]; then
+		err "{\"status\": \"Failure\", \"message\": \"validation failed, keyvaultobjectnames is empty\"}"
+		exit 1
+	fi
+
+	if [ -z "${KEYVAULT_OBJECT_TYPES}" ]; then
+		err "{\"status\": \"Failure\", \"message\": \"validation failed, keyvaultobjecttypes is empty\"}"
+		exit 1
+	fi
+
+	# set default
+	if [ -z "${USE_POD_IDENTITY}" ]; then
+		USE_POD_IDENTITY=false
+	fi
+
+	if [ "${USE_POD_IDENTITY}" = false ]; then
+		if [ -z "${CLIENTID}" ]; then
+			err "{\"status\": \"Failure\", \"message\": \"validation failed, secret/clientid is empty\"}"
+			exit 1
+		fi
+
+		if [ -z "${CLIENTSECRET}" ]; then
+			err "{\"status\": \"Failure\", \"message\": \"validation failed, secret/clientsecret is empty\"}"
+			exit 1
+		fi
+
+		echo "`date` CLIENTID: ${CLIENTID}" >> $LOG
+	else
+		if [ -z "${PODNAMESPACE}" ]; then
+			err "{\"status\": \"Failure\", \"message\": \"validation failed, pod.namespace is empty\"}"
+			exit 1
+		fi
+
+		if [ -z "${PODNAME}" ]; then
+			err "{\"status\": \"Failure\", \"message\": \"validation failed, pod.name is empty\"}"
+			exit 1
+		fi
+
+		echo "`date` PODNAME: ${PODNAME}" >> $LOG
+	fi
+
+	# set default
+	if [ -z "${CLOUD_NAME}" ]; then
+		CLOUD_NAME=""
+	fi
+	
+	mkdir -p "${MNTPATH}" >> $LOG
+	if [ $? -ne 0 ]; then
+        errorLog=`tail -n 1 "${LOG}"`
+        err "{ \"status\": \"Failure\", \"message\": \"Failed to mkdir at ${MNTPATH}, error log:${errorLog}\" }"
+        exit 1
+    fi
+
+	echo "`date` mount" >> $LOG
+	/bin/mount -t tmpfs tmpfs "${MNTPATH}" >> $LOG
+	if [ $? -ne 0 ]; then
+		errorLog=`tail -n 1 "${LOG}"`
+		err "{ \"status\": \"Failure\", \"message\": \"Failed to mount at ${MNTPATH}, error log:${errorLog}\" }"
+		exit 1
+	fi
+
+	echo "`date` $KVFV -logtostderr=1 -vaultName=${KEYVAULT_NAME} -vaultObjectNames=${KEYVAULT_OBJECT_NAMES} -vaultObjectAliases=${KEYVAULT_OBJECT_ALIASES} -resourceGroup=${RESOURCE_GROUP} -dir=${MNTPATH} -subscriptionId=${SUBSCRIPTION_ID} -cloudName=${CLOUD_NAME} -tenantId=${TENANT_ID} -aADClientSecret=${CLIENTSECRET} -aADClientID=${CLIENTID} -usePodIdentity=${USE_POD_IDENTITY} -podNamespace=${PODNAMESPACE} -podName=${PODNAME} -vaultObjectVersions=${KEYVAULT_OBJECT_VERSIONS} -vaultObjectTypes=${KEYVAULT_OBJECT_TYPES}" >> $LOG
+	$KVFV -logtostderr=1 -vaultName=${KEYVAULT_NAME} -vaultObjectNames=${KEYVAULT_OBJECT_NAMES} -vaultObjectAliases=${KEYVAULT_OBJECT_ALIASES} -resourceGroup=${RESOURCE_GROUP} -dir=${MNTPATH} -subscriptionId=${SUBSCRIPTION_ID} -cloudName=${CLOUD_NAME} -tenantId=${TENANT_ID} -aADClientSecret=${CLIENTSECRET} -aADClientID=${CLIENTID} -usePodIdentity=${USE_POD_IDENTITY} -podNamespace=${PODNAMESPACE} -podName=${PODNAME} -vaultObjectVersions=${KEYVAULT_OBJECT_VERSIONS} -vaultObjectTypes=${KEYVAULT_OBJECT_TYPES} >> $LOG 2>&1
+	
+	if [ $? -ne 0 ] ; then
+		errorLog=`tail -n 1 "${LOG}" | sed 's/.*Message=//' | tr -d '"'`
+		echo "`date` umount" >> $LOG
+		/bin/umount $MNTPATH >> $LOG
+		err "{\"status\": \"Failure\", \"message\": \"$KVFV failed, $errorLog \"}"
+		exit 1
+	else
+		log "{\"status\": \"Success\"}"
+		exit 0
+	fi
+}
+
+unmount() {
+	MNTPATH="$1"
+
+	if [ $(ismounted) -eq 0 ] ; then
+		log "{\"status\": \"Success\"}"
+		exit 0
+	fi
+	echo "`date` umount" >> $LOG
+	/bin/umount $MNTPATH >> $LOG
+	if [ $? -ne 0 ]; then
+		errorLog=`tail -n 1 "${LOG}"`
+		err "{ \"status\": \"Failure\", \"message\": \"Failed to unmount volume at ${MNTPATH}, error log:${errorLog}\" }"
+		exit 1
+	fi
+	echo "`date` rmdir" >> $LOG
+	rmdir ${MNTPATH} >> $LOG
+
+	log '{"status": "Success"}'
+	exit 0
+}
+
+## ---------------
+## main
+## ---------------
+
+op=$1
+
+if [ "$op" = "init" ]; then
+	log '{"status": "Success", "capabilities": {"attach": false}}'
+	exit 0
+fi
+
+if [ $# -lt 2 ]; then
+	usage
+fi
+
+shift
+
+case "$op" in
+	mount)
+		mount $*
+		;;
+	unmount)
+		unmount $*
+		;;
+	*)
+	usage
+esac
+
+exit 1

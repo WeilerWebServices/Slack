@@ -1,0 +1,65 @@
+# IAM configuration
+# We create an instance role for the nodes
+iamRole/kubernetes.node.{{ .ClusterName }}:
+  rolePolicyDocument: resources/iam/kubernetes-node-role.json
+
+iamRolePolicy/kubernetes.node.{{ .ClusterName }}:
+  role: iamRole/kubernetes.node.{{ .ClusterName }}
+  policyDocument: resources/iam/kubernetes-node-policy.json
+
+iamInstanceProfile/kubernetes.node.{{ .ClusterName }}: {}
+
+iamInstanceProfileRole/kubernetes.node.{{ .ClusterName }}:
+  instanceProfile: iamInstanceProfile/kubernetes.node.{{ .ClusterName }}
+  role: iamRole/kubernetes.node.{{ .ClusterName }}
+
+# Create security group for nodes
+securityGroup/kubernetes.node.{{.ClusterName}}:
+  vpc: vpc/kubernetes.{{ .ClusterName }}
+  description: 'Security group for nodes'
+
+# Allow full egress
+securityGroupRule/node-egress:
+  securityGroup: securityGroup/kubernetes.node.{{.ClusterName}}
+  egress: true
+  cidr: 0.0.0.0/0
+
+# SSH is open to the world
+securityGroupRule/ssh-external-to-node:
+  securityGroup: securityGroup/kubernetes.node.{{.ClusterName}}
+  cidr: 0.0.0.0/0
+  protocol: tcp
+  fromPort: 22
+  toPort: 22
+
+# Nodes can talk to nodes
+securityGroupRule/all-node-to-node:
+  securityGroup: securityGroup/kubernetes.node.{{.ClusterName}}
+  sourceGroup: securityGroup/kubernetes.node.{{.ClusterName}}
+
+# Nodes can talk masters nodes
+securityGroupRule/all-node-to-master:
+  securityGroup: securityGroup/kubernetes.master.{{ .ClusterName }}
+  sourceGroup: securityGroup/kubernetes.node.{{.ClusterName}}
+
+# LaunchConfiguration & ASG for nodes
+launchConfiguration/kubernetes.nodes.{{ .ClusterName }}:
+  sshKey: sshKey/kubernetes.{{ .ClusterName }}
+  securityGroups:
+    - securityGroup/kubernetes.node.{{ .ClusterName }}
+  iamInstanceProfile: iamInstanceProfile/kubernetes.node.{{ .ClusterName }}
+  imageId: {{ .NodeImage }}
+  instanceType: {{ .NodeMachineType }}
+  associatePublicIP: true
+  userData: resources/nodeup.sh _kubernetes_pool
+
+autoscalingGroup/kubernetes.nodes.{{ .ClusterName }}:
+  launchConfiguration: launchConfiguration/kubernetes.nodes.{{ .ClusterName }}
+  minSize: {{ .NodeCount }}
+  maxSize: {{ .NodeCount }}
+  subnets:
+{{ range $zone := .NodeZones }}
+    - subnet/kubernetes.{{ $zone.Name }}.{{ $.ClusterName }}
+{{ end }}
+  tags:
+    k8s.io/role: node

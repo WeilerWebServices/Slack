@@ -1,0 +1,333 @@
+#!/bin/sh
+
+#
+# SM Framework Core Module ~ Modules (modules)
+#
+
+__sm.modules.core.initialize()
+{
+  (( ! ${__sm_modules_initialized:=0} )) || return 0
+  true $((__sm_modules_initialized++))
+
+  typeset -ga __sm_modules_loaded
+  typeset _module _name _path
+
+  __sm.extension.paths.initialize
+
+  #core is loaded as BDSM starts
+  __sm_modules_loaded=(
+    "sm/core=core/sm/shell/core"
+    "sm/string=core/internal/shell/string"
+    "sm/logging=core/sm/shell/logging"
+    "sm/command=core/sm/shell/command"
+    "sm/modules=core/sm/shell/modules"
+    "sm/versionedfs=core/sm/shell/versionedfs"
+  )
+
+  for _module in ${__sm_modules_loaded[@]}
+  do
+    _name="${_module%%\=*}"
+    _path="${_module##*\=}"
+    __sm.log.search preload "$_name" "${_path}"
+  done
+
+  for _module in ${preload_modules[@]}
+  do
+    if ! __sm.module.include ${_module}
+    then
+      __sm.log.error "Cannot preload module: ${_module}."
+    fi
+  done
+}
+
+__sm.extension.paths.initialize()
+{
+  typeset -ga extensions_search_paths
+  typeset _extension_set_path
+
+  if [[ -z "${extensions_search_paths[*]}" ]]
+  then
+    extensions_search_paths=()
+
+    # Single user extensions
+    if [[ "${exts_system_path}" != "${exts_user_path}" ]]
+    then
+      extensions_search_paths+=( "${exts_user_path}/active" )
+    fi
+
+    # Single system extensions
+    extensions_search_paths+=( "${exts_system_path}/active" )
+
+    # User extension sets
+    if [[ "${sets_system_path}" != "${sets_user_path}" ]]
+    then
+      for _extension_set_path in "${sets_user_path}"/active/*
+      do
+        if [[ -d "${_extension_set_path}" ]]
+        then
+          extensions_search_paths+=( "${_extension_set_path}" )
+        fi
+      done
+    fi
+
+    # System extension sets
+    for _extension_set_path in "${sets_system_path}"/active/*
+    do
+      if [[ -d "${_extension_set_path}" ]]
+      then
+        extensions_search_paths+=( "${_extension_set_path}" )
+      fi
+    done
+  fi
+
+  case " ${extensions_search_paths[*]} " in
+    (*[[:space:]]${sm_path}/core[[:space:]]*)
+      true
+      ;;
+    (*) # Core is required to run, add it if not found
+      extensions_search_paths+=( "${sm_path}/core" )
+    ;;
+  esac
+
+  __sm.log.debug search "sets_user_path:${sets_user_path}:"
+  __sm.log.debug search "exts_user_path:${exts_user_path}:"
+  __sm.log.debug search "extensions_search_paths:${extensions_search_paths[*]}:"
+  export extensions_search_paths
+}
+
+modules()
+{
+  __sm.log.warn "modules() is depreciated, instead use includes()"
+  __sm.includes "$@"
+}
+
+# modules()
+includes()
+{
+  __sm.includes "$@"
+}
+
+__sm.includes()
+{
+  case "$1" in
+    (include|load)
+      shift #compatibility mode
+      ;;
+  esac
+
+  [[ -n "$*" ]] || __sm.log.fail "No modules given to include."
+
+  __sm.modules.include "$@"
+}
+
+__sm.modules.include()
+{
+  typeset _module _sm _extension _path _file _modules
+
+  for _module in "$@"
+  do
+    if ! __sm.module.include "${_module}"
+    then
+      __sm.log.fail "Could not find module path for ${_module}."
+    fi
+  done
+}
+
+__sm.module.include()
+{
+  typeset _module _file _module_dependency _module_path _hook _function
+  _module="$1"
+
+  if __sm.module.is.loaded "${_module}"
+  then
+    return 0
+  fi
+
+  # Search for module.
+  if __sm.extension.in.paths __sm.module.detect "${_module}"
+  then
+    __sm.log.search module "$module_name" "${module_path##${sm_path}\/}"
+    __sm_modules_loaded+=("${module_name}=${module_path##${sm_path}\/}")
+  else
+    __sm.log.search module "${_module}" "Not found !!!"
+    return 1
+  fi
+
+  # store path, so dependencies do not overwrite it.
+  _module_path="${module_path}"
+
+  # Load env before dependencies, so they can use env settings.
+  if [[ -s "${_module_path}/env" ]]
+  then
+    source "${_module_path}/env" # TODO: should we check for errors here ?!?!?!
+  fi
+
+  # Load module dependencies.
+  if [[ -s "${module_path}/includes" ]]
+  then
+    while read -r _module_dependency
+    do
+      if ! __sm.module.include "${_module_dependency}"
+      then
+        __sm.log.error "Could not find module dependency '${_module_dependency}' "\
+          "from '${_module_path##${sm_path}\/}/includes'."
+      fi
+    done < "${_module_path}/includes"
+  fi
+
+  # Load module
+  if [[ -s "${_module_path}/functions" ]]
+  then
+    #TODO: should we check for errors here ?!?!?!
+    source "${_module_path}/functions"
+    __sm.trace.functions
+  fi
+  for _file in hooks cli initialize
+  do
+    if [[ -s "${_module_path}/${_file}" ]]
+    then
+      #TODO: should we check for errors here ?!?!?!
+      source "${_module_path}/${_file}"
+    fi
+  done
+
+  _function="${_module//\//_}"
+  _function="${_function/_shell/_}"
+
+  for _hook in initialize # options, etc... ?
+  do
+    # TODO: This may need to be adjusted for zsh.
+    if __sm.command.is.function "${_function}_${_hook}"
+    then
+      "${_function}_${_hook}"
+    fi
+  done
+
+  return 0
+}
+
+__sm.trace.functions()
+{
+  typeset -ga trace_functions
+  typeset     _function_name
+
+  if (( ${#trace_functions} ))
+  then
+    for _function_name in $trace_functions
+    do
+      if declare -f "${_function_name}" > /dev/null 2>&1
+      then
+        typeset -ft "${_function_name}"
+      fi
+    done
+  fi
+}
+
+#TODO: remove - deprecated
+__sm.modules.reinitialize()
+{
+  typeset _module _loaded_modules _module_path _initialize_path
+
+  _loaded_modules=" ${__sm_modules_loaded[*]} "
+
+  for _module in "$@"
+  do
+    _module_path="${_loaded_modules##* ${_module}=}"
+    _module_path="${_module_path%% *}"
+    [[ -n "${_module_path}" ]] ||
+      __sm.log.fail "Can not reinitialize module as it was not yet loaded"
+
+    _initialize_path="${sm_path}/${_module_path}/initialize"
+    [[ ! -s "${_initialize_path}" ]] || source "${_initialize_path}"
+  done
+}
+
+__sm.module.is.loaded()
+{
+  typeset _name
+  _name="${1}"
+  case " ${__sm_modules_loaded[*]} " in
+    (*[[:space:]]${_name}=*)
+      return 0
+      ;;
+    (*)
+      return 1
+      ;;
+  esac
+}
+
+__sm.extension.in.paths()
+{
+  typeset callback _path
+  callback="${1:-}"
+  (( $# )) && shift || __sm.log.fail "Callback name must be given ast the first parameter."
+
+  if [[ -n "$1" ]] # do search if params given
+  then
+    for _path in "${extensions_search_paths[@]}"
+    do
+      "${callback}" "${_path}" "$@" || continue
+      return 0
+    done
+  fi
+  return 1
+}
+
+__sm.cli.in.path()
+{
+  typeset callback
+  callback="${1:-}"
+  (( $# )) && shift || __sm.log.fail "Callback name must be given ast the first parameter."
+
+  "${callback}" "${sm_path}/core" "cli" "$@"
+}
+
+__sm.extension.path.reorder()
+{
+  typeset -g __sm_rebuilded_path
+  typeset part extensions_path extension output
+  part="${1:-}"
+  extensions_path="${2:-}"
+  extension="${3:-}"
+  (( $# >= 3 )) && shift 3 || __sm.log.fail "Path part extensions_path extnesion must be given first ."
+
+  output="$extensions_path/$extension/$part/$*"
+  __sm_rebuilded_path="${output// //}"
+}
+
+__sm.extension.path.rebuild()
+{
+  typeset part extensions_path params
+  part="$1"
+  extensions_path="$2"
+  (( $# >= 2 )) && shift 2 || __sm.log.fail "Path extensions_path part must be given first."
+
+  params="$*"
+  __sm.extension.path.reorder "${part}" "${extensions_path}" ${=params//\// }
+}
+
+__sm.module.detect()
+{
+  typeset -g module_path module_name
+  typeset extensions_path _module_path
+  extensions_path=$1
+  (( $# )) && shift || __sm.log.fail "Extensions path must be given as the first parameter."
+
+  __sm.extension.path.rebuild "shell" $extensions_path $@
+  _module_path=${__sm_rebuilded_path}
+
+  if [[ -d "${_module_path}/functions" ]]
+  then
+    return 1
+  fi
+
+  if [[ -s "${_module_path}/functions" || -s "${_module_path}/includes" ]]
+  then
+    module_path=${_module_path}
+    module_name="$*"
+    module_name="${module_name// //}"
+    return 0
+  else
+    return 1
+  fi
+}

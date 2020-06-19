@@ -1,0 +1,78 @@
+#!/bin/sh
+
+#
+# variable is empty {variable}
+# variable is nonempty {variable}
+# variables are empty {variables}
+# variables are nonempty {variables}
+# variables must be empty {variables}
+# variables must be nonempty {variables}
+#
+variable() { variables "$@"; }
+
+variables()
+{
+  trace_filter variables || set -o xtrace
+
+  typeset _command _variables _type __variables_commands
+
+  _variables=()
+
+  __variables_commands=(
+    "is empty=are empty"
+    "is nonempty=are nonempty"
+    "must be empty"
+    "must be nonempty"
+  )
+
+  if __sm.command.detect "$*" "${__variables_commands[@]}"
+  then
+    _command="${__sm_command_dotted}"
+    shift "${__sm_command_words}"
+  else
+    __sm.log.fail "No command given.\nUsage:  \nvariables <command> ..."
+  fi
+
+  while (( $# ))
+  do
+    case "$1" in
+      (type)
+        case "$2" in
+          (log|error|fail)
+            _type=$2
+            shift 2
+            ;;
+          ("")
+            __sm.log.fail "Variable output type was not given after 'type'. " \
+              "Valid types are: log, error, fail"
+            ;;
+          (*)
+            __sm.log.fail "Variable output type '$2' in not valid. " \
+              "Valid types are: log, error, fail"
+            ;;
+        esac
+        ;;
+      (*)
+        _variables+=( "$1" )
+        shift
+        ;;
+    esac
+  done
+
+  # TODO: Think through variables more...
+  case "${_command}" in
+    (are.empty|are.nonempty)
+      [[ -n "${_variables[*]}" ]] || __sm.log.error "No variable names given for validation"
+      __sm.variables.${_command} "${_variables[@]}"
+      ;;
+    (must.be.empty|must.be.nonempty)
+      [[ -n "${_variables[*]}" ]] || __sm.log.error "No variable names given for validation"
+      [[ -n "${_type}" ]] || __sm.log.error "No message type given for validation"
+      __sm.variables.${_command} "${_type}" "${_variables[@]}"
+      ;;
+    (*)
+      __sm.log.fail "Unknown variables command '${_command}'"
+      ;;
+  esac
+}
+

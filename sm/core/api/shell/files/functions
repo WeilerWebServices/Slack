@@ -1,0 +1,249 @@
+#!/bin/sh
+
+#
+# SM Framework Core Module ~ Files (files)
+#
+# API Version: 1.0.0
+#
+# files *
+#
+# TODO: Finish this API documentation below
+#
+# file exists {file}
+# files exist {file}
+# file is empty {file}
+# files are nonempty {file}
+# file is executable {file}
+# files are executable {file}
+# file is symlink {file}
+# files are symlinks {file}
+# file absolute path {file}
+# file sha 256 {file}
+# file sha 512 {file}
+# file change owner {owner} {file}
+# file chown {mode} {file}
+# files chown {mode} {files}
+# file change permissions {mode} {file}
+# files change permissions {mode} {files}
+# file chmod {mode} {file}
+# files chmod {mode} {files}
+# files change permissions
+# file append to {file} content {content}
+# file copy from {source} to {target}
+# file move from {source} to {target}
+# file link symbolic force from {source} to {target}
+# file replace regex {regex} with {content} in {file}
+# file open {file}
+# file md5 {file}
+# file(s) expand {file}
+# file search {file} # NIY
+# file(s) source {file}
+# file remove {file}
+# file create {file}
+# file touch {file}
+# files touch {files}
+# files within {path}
+# files in {path}
+file() { files "$@" ; }
+
+files()
+{
+  trace_filter filesystem || set -o xtrace
+
+  typeset -a _files >/dev/null 2>&1
+  typeset _token _command _subcommand _path _file _files _source _target _mode \
+    _owner _flags _string _regex __files_commands _as_user >/dev/null 2>&1
+
+  __files_commands=(
+    "is empty=are empty"
+    "is nonempty=are nonempty"
+    "is executable=are executable"
+    "is missing=are missing"
+    "is symlink=are symlinks"
+    "absolute path"
+    "sha 256"
+    "sha 512"
+    "change owner to=chown"
+    "change permissions to=chmod"
+    "change rights to=chmod"
+  )
+
+  if __sm.command.detect "$*" "${__files_commands[@]}"
+  then
+    _command="${__sm_command_dotted}"
+    shift "${__sm_command_words}"
+  else
+    __sm.log.fail "No command given.\nUsage:  \nfiles <command> ..."
+  fi
+
+  case "${_command}" in
+    (sha.*)
+      command -v shasum > /dev/null 2>&1 || __sm.log.fail "shasum command missing, cannot use 'files sha'"
+      ;;
+    (chmod)
+      _mode="${1}"
+      (( $# )) && shift || __sm.log.fail "Mode must follow keywords 'chmod'"
+      ;;
+    (chown)
+      _owner="${1}"
+      (( $# )) && shift || __sm.log.fail "Owner must be provided after keyword 'owner'"
+      ;;
+  esac
+
+  while (( $# > 0 ))
+  do
+    _token="$1" && shift
+    case "${_token}" in
+      (append)
+        _flags+=( -a )
+        ;;
+      (to)
+        _target="${1}"
+        (( $# )) && shift || __sm.log.fail "Target path must be provided after keyword '${_token}'"
+        ;;
+      (from)
+        _source="${1}"
+        (( $# )) && shift || __sm.log.fail "Source path must be provided after keyword 'from'"
+        ;;
+      (mode|permissions)
+        _mode="${1}"
+        (( $# )) && shift || __sm.log.fail "Mode must follow keywords 'mode|permissions'"
+        ;;
+      (owner)
+        _owner="${1}"
+        (( $# )) && shift || __sm.log.fail "Owner must be provided after keyword 'owner'"
+        ;;
+      (recursive|recursively)
+        _flags+=(-R)
+        shift # Remove the recursive flag parameter.
+        ;;
+      (symbolic)
+        _flags+=( -s )
+        ;;
+      (force)
+        _flags+=( -f )
+        ;;
+      (string|content)
+        _string="$1"
+        (( $# )) && shift || __sm.log.fail "A string must be followed by keyword 'string'"
+        ;;
+      (regex|regexp)
+        _regex="$1"
+        (( $# )) && shift || __sm.log.fail "A regex must be followed by keyword 'regex'"
+        ;;
+      (in)
+        _files+=("$1")
+        (( $# )) && shift || __sm.log.fail "A file name must follow keyword 'in'"
+        ;;
+      (key)
+        _key="$1"
+        (( $# )) && shift || __sm.log.fail "A key name must follow keyword 'key'"
+        ;;
+      (value)
+        _value="$1"
+        (( $# )) && shift || __sm.log.fail "A value must follow keyword 'value'"
+        ;;
+      (with)
+        _string="$1"
+        (( $# )) && shift || __sm.log.fail "A content string must follow keyword 'with'"
+        ;;
+      (as)
+        _as_user="$1"
+        (( $# )) && shift || __sm.log.fail "A content string must follow keyword 'as'"
+        ;;
+      (*)
+        _files+=("${_token}")
+        ;;
+    esac
+  done
+
+  case "${_command}" in
+    (contain|containing|contains)
+      [[ -n "${_string}" ]] || [[ -n "${_regex}" ]] ||
+        __sm.log.fail "regexp or string must be given for 'files ${_command}'."
+      if __sm.files.${_command} "${_string}" "${_regex}" "${_files[@]}"
+      then return 0 ; else return 1 ; fi
+      ;;
+    (replace)
+      [[ -n "${_string}" ]] || __sm.log.fail "string must be given for 'files ${_command}'."
+      [[ -n "${_regex}" ]] || __sm.log.fail "regexp must be given for 'files ${_command}'."
+      if __sm.files.${_command} "${_string}" "${_regex}" "${_files[@]}"
+      then return 0 ; else return 1 ; fi
+      ;;
+    (are.*|sha.*|absolute.*)
+      if __sm.files.${_command} "${_files[@]}"
+      then return 0 ; else return 1 ; fi
+      ;;
+    (open|md5|enter|join|expand|search|within|in|source|empty|nonempty|exist|exists|remove|create|touch)
+      [[ -n "${_files}" ]] || __sm.log.fail "files must be given for 'files ${_command}'."
+      if __sm.files.${_command} "${_files[@]}"
+      then return 0 ; else return 1 ; fi
+      ;;
+    (link)
+      [[ -e "${_source}" ]]   ||
+        __sm.log.fail "Cannot link ${_source} to ${_target}, source does not exist!"
+      if [[ -f "${_target}" ]] && ! __sm.string.contains "-f" "${_flags[*]}"
+      then
+        __sm.log.fail "Cannot link ${_source} to ${_target} which exists as a file!"
+      fi
+      if [[ -d "${_target}" ]] && ! __sm.string.contains "-f" "${_flags[*]}"
+      then
+        __sm.log.fail "Cannot link ${_source} to ${_target} which exists as a directory"
+      fi
+      #TODO: what about the -f (force flag) to overwrite if target exists ?
+      __sm.files.link "${_source}" "${_target}" "${_flags[*]}"
+      ;;
+    (copy|move)
+      if [[ -n "${_files[*]}" ]]
+      then
+        [[ -n "${_source}" || -n "${_target}" ]] || __sm.log.fail "Source or target path (to/from) for ${_command}ing files must be given."
+      else
+        [[ -n "${_source}" && -n "${_target}" ]] || __sm.log.fail "Source and target path (to/from) for ${_command}ing file must be given."
+      fi
+      __sm.files.${_command} "${_source:-.}" "${_target:-.}" "${_flags[*]}" "${_files[@]}"
+      ;;
+    (write)
+      [[ -n "${_string}" ]] || __sm.log.fail "String must be given; string 'string'."
+      [[ -n "${_target}" ]] || __sm.log.fail "Target must be given;  to {file name}."
+      __sm.files.write "${_string}" "${_target}" "${_flags[*]}" ${_as_user}
+      ;;
+    (*)
+      if [[ -z "${_owner}" && -z "${_mode}" ]]
+      then
+        __sm.log.fail "Unknown command for files: '${_command}' "\
+          "A files command must be specified as the first parameter: "\
+          "{chown,chmod,create,remove,copy,in,search,enter,exist,join,expand,move,copy}"
+      fi
+      ;;
+  esac
+
+  case "${_command}" in
+    (chown|chmod) true ;; # Flags are for chown/chmod
+    (*) _flags=() ;;      # Clean flags if using mode/owner
+  esac
+
+  if [[ -n "${_owner}" ]]
+  then
+    if [[ -n "${_files[*]}"  ]]
+    then
+      [[ -z "${_target}" ]] || pushd "${_target}" >/dev/null 2>&1
+      __sm.files.chown "${_owner}" "${_flags[*]}" "${_files[@]}"
+      [[ -z "${_target}" ]] || popd >/dev/null 2>&1
+    else
+      __sm.files.chown "${_owner}" "${_flags[*]}" "${_target}"
+    fi
+  fi
+
+  if [[ -n "${_mode}" ]]
+  then
+    if [[ -n "${_files[*]}"  ]]
+    then
+      [[ -z "${_target}" ]] || pushd "${_target}" >/dev/null 2>&1
+      __sm.files.chmod "${_mode}" "${_flags[*]}" "${_files[@]}"
+      [[ -z "${_target}" ]] || popd >/dev/null 2>&1
+    else
+      __sm.files.chmod "${_mode}" "${_flags[*]}" "${_target}"
+    fi
+  fi
+}
+

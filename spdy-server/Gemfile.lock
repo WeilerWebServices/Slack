@@ -1,0 +1,23 @@
+GIT
+  remote: git://github.com/slack/spdy
+  revision: 91f61f4e0f11b562b075c24003c2d00dfa7e3bab
+  specs:
+    spdy (0.0.4)
+      bindata
+      ffi-zlib
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    bindata (1.5.0)
+    eventmachine (1.0.3)
+    ffi (1.9.0)
+    ffi-zlib (0.2.0)
+      ffi
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  eventmachine
+  spdy!

@@ -1,0 +1,76 @@
+#!/bin/sh
+
+detect_man()
+{
+  typeset _extensions_path _extension _man_path _man_name _man_paths
+  typeset -g man_file
+  _extensions_path=$1
+  _extension=$2
+  shift
+
+  _man_name="$*" #include extension in name
+  shift
+
+  _man_name="${_man_name:-cli}"
+  _man_name="${_man_name// /_}"
+
+  if [[ -n "${man_number}" ]]
+  then
+    _man_path="${_extensions_path}/${_extension}/man/man${man_number}/${_man_name}.${man_number}"
+    if [[ -f "${_man_path}" ]]
+    then
+      man_file="${_man_path}"
+      return 0
+    elif [[ -f "${_man_path}.gz" ]]
+    then
+      man_file="${_man_path}.gz"
+      return 0
+    fi
+    return 1
+  fi
+
+  _man_paths=( ${_extensions_path}/${_extension}/man/man*/${_man_name}* )
+  if (( ${#_man_paths[@]} ))
+  then
+    man_file="${_man_paths[__sm_array_start]}"
+    return 0
+  fi
+  return 1
+}
+
+man_display()
+{
+  typeset man_path man_params man_number status _man_name
+
+  if echo $1 | grep -E '^[0-9]+$' >/dev/null
+  then
+    man_number=$1
+    shift
+  fi
+
+  if __sm.extension.in.paths detect_man "$@" ||
+    __sm.cli.in.path detect_man "$@"
+  then
+    if ! man $man_file
+    then
+      status=$?
+      case $status in
+        (16)
+          #Not found page - ignore
+          ;;
+        (*)
+          __sm.log.error "Man returned unknown status $status"
+      esac
+    fi
+  else
+    _man_name="$*"
+    _man_name="${_man_name:-cli}"
+    _man_name="${_man_name// /_}"
+    log "Could not find man page for ${_man_name}${man_number:+.${man_number}}"
+  fi
+}
+
+man_list()
+{
+  NIY
+}

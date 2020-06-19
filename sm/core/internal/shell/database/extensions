@@ -1,0 +1,50 @@
+#!/bin/sh
+
+database_extension_setup()
+{
+  typeset extension module path
+  extension="${1}"
+  (( $# )) && shift || __sm.log.fail "Extension must be given as the first parameter."
+  module="${1}"
+  (( $# )) && shift || __sm.log.fail "Module must be given as the second parameter."
+  path="${1}"
+  (( $# )) && shift || __sm.log.fail "Path must be given as the third parameter."
+
+  paths enter "${path}"
+
+  paths create "modules/${module}" "bin/${module}"
+
+  # Setup modules/package/{functions,initialize,cli}
+  for file in functions initialize cli
+  do
+    files write string '#!/bin/sh' to "modules/${module}/${file}"
+  done
+
+  files write append string "\n${module}_cli\n" to "modules/${module}/cli"
+
+  # setup bin/package/{...}
+  for action in help initialize
+  do
+    files write string '#!/bin/sh' \
+      to "bin/${module}/${action}" \
+      mode 0755
+  done
+
+  files write append \
+    string "
+description \"Extension for managing ${extension} (${website_url}).\"
+
+action \"initialize\" \"Initialize ${extension} database.\"
+
+show_help usage
+" \
+    to "bin/${module}/help"
+
+  for action in initialize
+  do
+    files write append \
+      string "\n${module}_${action}\n" \
+      to "bin/${module}/${action}"
+  done
+}
+

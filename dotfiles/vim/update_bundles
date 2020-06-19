@@ -1,0 +1,56 @@
+#!/usr/bin/env ruby
+
+require 'fileutils'
+
+git_bundles = [
+  "https://github.com/kchmck/vim-coffee-script.git",
+  "git://github.com/altercation/vim-colors-solarized.git",
+  "git://github.com/avakhov/vim-yaml.git",
+  "git://github.com/dhruvasagar/vim-table-mode.git",
+  "git://github.com/elixir-lang/vim-elixir.git",
+  "git://github.com/fatih/vim-go.git",
+  "git://github.com/jlanzarotta/bufexplorer.git",
+  "git://github.com/kana/vim-textobj-user.git",
+  "git://github.com/kien/ctrlp.vim.git",
+  "git://github.com/mileszs/ack.vim.git",
+  "git://github.com/nelstrom/vim-textobj-rubyblock.git",
+  "git://github.com/scrooloose/nerdtree.git",
+  "git://github.com/scrooloose/syntastic.git",
+  "git://github.com/slack/vim-align.git",
+  "git://github.com/tpope/vim-bundler.git",
+  "git://github.com/tpope/vim-commentary.git",
+  "git://github.com/tpope/vim-fugitive.git",
+  "git://github.com/tpope/vim-markdown.git",
+  "git://github.com/tpope/vim-rails.git",
+  "git://github.com/tpope/vim-surround.git",
+  "git://github.com/markcornick/vim-terraform.git",
+  "git://github.com/vim-ruby/vim-ruby.git",
+  "git://github.com/vim-scripts/matchit.zip.git",
+]
+
+bundles_dir       = File.join(File.dirname(__FILE__), "bundle")
+installed_bundles = []
+
+FileUtils.cd(bundles_dir)
+git_bundles.each do |url|
+  dir = url.split('/').last.sub(/\.git$/, '')
+  installed_bundles << dir
+
+  if Dir.exists?(dir)
+    puts "Updating #{url} in #{dir}"
+    %x{ bash -c 'set -x; pushd #{dir}; git fetch && git pull --rebase origin master; popd' }
+  else
+    puts "  Unpacking #{url} into #{dir}"
+    %x{ bash -c 'git clone #{url} #{dir}' }
+  end
+end
+
+# clean up orphaned directories
+Dir.glob('*').each do |dir|
+  next if dir =~ /^\./
+  next if installed_bundles.include?(dir)
+
+  puts "Pruning #{dir}"
+  FileUtils.rm_r dir, force: true
+  FileUtils.rmdir dir
+end

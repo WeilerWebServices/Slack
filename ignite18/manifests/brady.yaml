@@ -1,0 +1,39 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: nodebrady
+  labels:
+    app: nodebrady
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: nodebrady
+  type: ClusterIP
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: nodebrady
+  labels:
+    app: nodebrady
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nodebrady
+  template:
+    metadata:
+      labels:
+        app: nodebrady
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: nodebrady
+        image: "jhansen/brady:v0.0.1"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000

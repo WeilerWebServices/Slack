@@ -1,0 +1,8 @@
+core/cli/zdotdir/.zcompdump
+releases/
+release
+site/
+html/
+tags
+.rvmrc
+.idea

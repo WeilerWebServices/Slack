@@ -1,0 +1,29 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: aks-probes
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: aks-probes
+    spec:
+      containers:
+      - name: probes
+        image: jhansen/aks-probes:v0.1.0
+        imagePullPolicy: Always
+        command: ["tail", "-f", "/dev/null"]
+        env:
+          - name: TARGET_HOSTNAME
+            value: TARGET_HOSTNAME
+        readinessProbe:
+          exec:
+            command:
+              - /check
+          initialDelaySeconds: 10
+          timeoutSeconds: 60
+          periodSeconds: 60
+          failureThreshold: 2
+
+

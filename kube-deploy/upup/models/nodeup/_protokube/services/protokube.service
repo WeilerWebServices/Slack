@@ -1,0 +1,15 @@
+[Unit]
+Description=Kubernetes Protokube Service
+Documentation=https://github.com/kubernetes/kube-deploy/protokube
+After=docker.service
+
+[Service]
+EnvironmentFile=/etc/sysconfig/protokube
+ExecStartPre=/usr/bin/docker pull kope/protokube
+ExecStart=/usr/bin/docker run -v /:/rootfs/ --privileged kope/protokube /usr/bin/protokube "$DAEMON_ARGS"
+Restart=always
+RestartSec=2s
+StartLimitInterval=0
+
+[Install]
+WantedBy=multi-user.target

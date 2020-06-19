@@ -1,0 +1,11 @@
+#!/bin/sh
+
+if (( ${#extension_args[@]} == 0 ))
+then
+  log 'usage:\n  sm call function_name [function_args...]'
+elif __sm.command.is.function "${extension_args[${__sm_array_start}]}" >/dev/null
+then
+  "${extension_args[@]}"
+else
+  __sm.log.error "${extension_args[${__sm_array_start}]} is not a valid function name."
+fi

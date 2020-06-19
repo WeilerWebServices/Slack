@@ -1,0 +1,38 @@
+package: github.com/deis/steward
+ignore:
+  - k8s.io/kubernetes
+  - camlistore.org
+  - code.google.com
+  - github.com/docker/docker
+  - github.com/docker/distribution
+  - github.com/camlistore/camlistore
+  - labix.org/v2/mgo
+  - github.com/influxdb/influxdb
+  - github.com/aws/aws-sdk-go
+  - github.com/armon/go-metrics
+  - github.com/armon/consul-api
+  - github.com/Azure/azure-sdk-for-go
+  - google.golang.org/cloud
+  - cloud.google.com/go
+  - github.com/camlistore/go4
+  - github.com/google/cadvisor
+  - github.com/onsi/ginkgo
+  - github.com/docker/spdystream
+  - github.com/docker/go-connections
+  - code.google.com/p/go-charset
+  - k8s.io/heapster
+  - golang.org/x/sys
+import:
+- package: github.com/arschles/assert
+- package: github.com/kelseyhightower/envconfig
+- package: github.com/juju/loggo
+- package: github.com/gorilla/mux
+- package: github.com/arschles/testsrv
+- package: github.com/pborman/uuid
+- package: k8s.io/helm
+  version: v2.0.0-alpha.3
+- package: k8s.io/client-go/1.4
+  version: 93fcd402979cfad8a7151f96e016416947c6a3cb
+- package: github.com/deis/k8s-claimer
+  version: v0.1.0
+- package: github.com/technosophos/moniker

@@ -1,0 +1,190 @@
+#!/bin/sh
+
+ext_help()
+{
+  log "BDSM extension ext management
+
+ext list installed ext.
+ext known List extension ext that can be installed.
+ext install all Install all extension ext found on the known list.
+ext install {name} Install extension {name} found on the known list.
+ext install {name} {uri} Install extension {name} from the given {uri}.
+ext add Shortcut for install.
+ext update all Update all extension ext using remembered uris.
+ext update {name} Update extension {name} using remembered uri.
+ext up Shortcut for update.
+ext uninstall {name} Remove extension {name}.
+ext del Shortcut for uninstall.
+ext help Show this help.
+"
+}
+
+ext_list()
+{
+  typeset extensions
+  true ${COLUMNS:=80}
+
+  if __sm.extension.in "${exts_system_path}/active"
+  then
+    log "exts: #system"
+    echo ${found_extensions[@]} | xargs -s ${COLUMNS} | xargs -I '{}' echo "  - {}"
+  else
+    log "# No single system extensions (exts) are currently installed."
+  fi
+
+  if [[ "${exts_system_path}" != "${exts_user_path}" ]]
+  then
+    if __sm.extension.in "${exts_user_path}/active"
+    then
+      log "exts: #user"
+      echo ${found_extensions[@]} | xargs -s ${COLUMNS} | xargs -I '{}' echo "  - {}"
+    else
+      log "# No single user extensions (exts) are currently installed."
+    fi
+  fi
+}
+
+ext_list_known()
+{
+  true ${COLUMNS:=80}
+
+  printf "# %18s | %s\n" "Extension name" "Repository"
+
+  while read line
+  do
+    printf "%20s   %s\n" "${line/\=*}" "${line/*\=}"
+  done < "${sm_path}/core/cli/config/known_ext"
+}
+
+ext_install()
+{
+  typeset _name _names _uri _extension_namespace
+  _names="$1"
+  _uri="$2"
+  (( $# )) && shift || __sm.log.fail "No extension name was given."
+
+  _names=(${_names//,/ })
+
+  _extension_namespace="${exts_user_path#${sm_path}\/}"
+  _extension_namespace="${_extension_namespace#${sm_user_path}\/}"
+  _extension_namespace="${_extension_namespace/\/active/}"
+
+  for _name in ${_names[@]}
+  do
+    extension install as "${_name}" ${_uri:+from} ${_uri}
+  done
+}
+
+ext_install_all()
+{
+  typeset _ext _name _uri
+  true ${COLUMNS:=80}
+  while read _ext
+  do
+    [[ "${line}" != \#* ]] || continue
+    _name="${_ext/\=*}"
+    _uri="${_ext/*\=}"
+    ext_install "${_name}" "${_uri}" --on-fail true
+  done < "${sm_path}/core/cli/config/known_exts"
+}
+
+ext_update()
+{
+  typeset _name _uri
+  (( $# > 0 )) ||
+    __sm.log.error "Cannot update extension ext without name."
+
+  for _name in "$@"
+  do
+    if [[ ! -d "${exts_user_path}/active/${_name}" ]]
+    then
+      if [[ -d "${exts_system_path}/active/${_name}" ]]
+      then
+        __sm.log.error "Extension ${_name} is in system exts and cannot be updated."
+      else
+        __sm.log.error "Extension ${_name} does not exist."
+      fi
+    fi
+
+    if [[ ! -s "${exts_user_path}/active/${_name}/.uri" ]]
+    then
+      __sm.log.warn "Extension ${_name} does not contain stored uri."
+      continue
+    fi
+
+    _uri=$( __sm.vcs.read_uri "${exts_user_path}/active/${_name}/.uri" )
+
+    if [[ -z "${_uri}" ]]
+    then
+      __sm.log.warn "Extension ${_name} does not contain stored uri."
+    else
+      ext_install "${_name}" "${_uri}"
+    fi
+  done
+}
+
+ext_update_all()
+{
+  typeset _name _entries
+  _entries=( "${exts_user_path}"/* )
+
+  if (( ! "${#_entries[@]}" ))
+  then
+    __sm.log.error "No extensions found for update."
+  fi
+
+  for _name in "${_entries[@]}"
+  do
+    [[ -d "${sets_user_path}/active/${_name}"  ]] || continue
+    ext_update "${_name##*/}"
+  done
+}
+
+ext_uninstall()
+{
+  typeset _name
+  _name="$1"
+  case "${_name}" in
+    */*|.|..)
+      __sm.log.error "Please specify a valid extension name."
+      ;;
+  esac
+
+  if [[ ! -d "${exts_user_path}/active/${_name}" ]]
+  then
+    if [[ -d "${exts_system_path}/active/${_name}" ]]
+    then
+      __sm.log.error "Extension ${_name} is in system exts and cannot be uninstalled."
+    else
+      __sm.log.error "Extension ${_name} does not exist."
+    fi
+  fi
+
+  versionedfs remove \
+    path "${exts_user_path}" name "${_name}"
+}
+
+ext_check_availability()
+{
+  typeset _ext _line _args
+  _args=($@)
+
+  # TODO: refactor this to take argument of uri to check instead.
+  #       provide check_known_exts_availability or some such to wrap this.
+  while read _ext
+  do
+    case "$line" in
+      (^#)
+        true # Skipt comment lines
+        ;;
+      (*)
+        while read _line
+        do
+          [[ "${_line}" == Status* ]] || continue
+          echo "${_ext/\=*}" "${_line/*:}"
+          break
+        done < <(curl -s --head https://github.com/sm/sm_"${_ext/\=*}")
+        ;;
+    esac
+  done < "${sm_path}/core/cli/config/known_ext"
+}

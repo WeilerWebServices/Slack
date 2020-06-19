@@ -1,0 +1,170 @@
+#!/bin/sh
+
+__sm.os.open()
+{
+  typeset _uri
+  _uri="${1:-}"
+  (( $# )) && shift || __sm.log.fail "Cannot open URI; No uri was given."
+
+  if __sm.command.exists open
+  then
+    open "${_uri}"
+  elif __sm.command.exists xdg-open
+  then
+    xdg-open "${_uri}"
+  else
+    __sm.includes include api/interactive
+    if shell is interactive
+    then
+      if [[ "${_uri}" == file* ]]
+      then
+        ${EDITOR:-less} "${_uri}"
+      else
+        curl -s "${_uri}"
+      fi
+    else
+      echo "$_uri"
+    fi
+  fi
+}
+
+__sm.os.type()
+{
+  typeset _type
+  case "$OSTYPE" in
+    (*linux*)
+      _type="linux"
+      ;;
+    (*darwin*)
+      _type="darwin"
+      ;;
+    (*bsd*)
+      _type="bsd"
+      ;;
+    (*solaris*)
+      _type="solaris"
+      ;;
+    (*aix*)
+      _type="aix"
+      ;;
+    (*)
+      # If the machine type is an unknown category then simply use it.
+      _type="$OSTYPE"
+      ;;
+  esac
+
+  if [[ -n "${1}" ]]
+  then
+    [[ "${_type}" == "${1}" ]]
+  else
+    printf "%s\n" "${_type}"
+  fi
+}
+
+__sm.os.type.is()
+{
+  __sm.os.type "$1"
+}
+
+__sm.os.cpu.count()
+{
+  typeset _cpu_count
+  _cpu_count=1
+
+  if __sm.os.type.is darwin
+  then
+    read -r _cpu_count < <(/usr/sbin/sysctl hw.ncpu)
+    _cpu_count="${_cpu_count//* }"
+
+  elif __sm.os.type.is linux
+  then
+    _cpu_count=$(awk '/^processor/{count++} END{print count}' /proc/cpuinfo 2>&1)
+
+  elif __sm.os.type.is solaris
+  then
+    __sm.log.warn "CPU counting for Solaris has not yet been implemented; returning 1."
+
+  elif __sm.os.type.is bsd
+  then
+    __sm.log.warn "CPU counting for BSD has not yet been implemented; returning 1."
+
+  elif __sm.os.type.is aix
+  then
+    __sm.log.warn "CPU counting for AIX has not yet been implemented; returning 1."
+  fi
+
+  (( _cpu_count > 0 )) || _cpu_count=1 # Sanity Check
+
+  printf "%d\n" ${_cpu_count}
+}
+
+__sm.os.version()
+{
+  read -r os_version < <(uname -r)
+  os_version=${os_version//-*}
+  printf "%s\n" "${os_version}"
+}
+
+__sm.os.version.major()
+{
+  os_version_major=$(__sm.os.version)
+  os_version_major="${os_version_major//\.*}"
+  printf "%s\n" "${os_version_major}"
+}
+
+__sm.os.version.minor()
+{
+  os_version_minor=$(__sm.os.version)
+  os_version_minor="${os_version_minor#*\.}"
+  os_version_minor="${os_version_minor%\.*}"
+  printf "%s\n" "${os_version_minor}"
+}
+
+__sm.os.version.patch()
+{
+  os_version_patch=$(__sm.os.version)
+  os_version_patch="${os_version_patch//*\.}"
+  printf "%s\n" "${os_version_patch}"
+}
+
+__sm.os.arch.type()
+{
+  case "${MACHTYPE//-*}" in
+    # The machine type is 32 bit.
+    # Note that this accounts for Solaris 32 bit as well (i86pc).
+    (*i386*|*i686*|*i86pc*)
+      printf "%s" "i386"
+      ;;
+    # The machine type is 64 bit.
+    (*x86_64*)
+      printf "%s" "x86_64"
+      ;;
+    # The machine type is PowerPC.
+    (*ppc*)
+      printf "%s" "ppc"
+      ;;
+  esac
+}
+
+__sm.os.arch()
+{
+  printf "%s\n" "${MACHTYPE//-*}"
+}
+
+__sm.os.arch.capable()
+{
+  if __sm.os.type.is darwin
+  then
+    typeset _string
+    read -r _string < <(sysctl hw.cpu64bit_capable)
+    if (( ${_string//* } == 1 ))
+    then
+      printf "%s" "x86_64"
+    else
+      __sm.os.arch.type
+    fi
+  else
+    __sm.os.arch.type
+  fi
+}
+

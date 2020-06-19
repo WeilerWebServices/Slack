@@ -1,0 +1,76 @@
+#!/bin/sh
+
+__sm.variables.are.nonempty()
+{
+  trace_filter variables || set -o xtrace
+  typeset _variable _variables
+  _variables=("$@")
+  (( $# )) && shift || __sm.log.fail "Cannot check if variables are nonempty; No variables were given."
+
+  for _variable in "${_variables[@]}"
+  do
+    eval "[[ -n \"\${${_variable}:-}\" ]]" || return 1
+  done
+  return 0
+}
+
+__sm.variables.are.empty()
+{
+  trace_filter variables || set -o xtrace
+  typeset _variable
+  _variable="${1:-}"
+  (( $# )) && shift || __sm.log.fail "Cannot check if variable is empty, as no variable was given."
+  eval "[[ -z \"\${${_variable}:-}\" ]]"
+}
+
+__sm.variables.filter()
+{
+  trace_filter variables || set -o xtrace
+  typeset -a __sm_variables_empty __sm_variables_nonempty
+
+  __sm_variables_empty=()
+  __sm_variables_nonempty=()
+
+  typeset _variable
+  for _variable in "$@"
+  do
+    if eval "[[ -z \"\${${_variable}:-}\" ]]"
+    then
+      __sm_variables_empty+=( "${_variable}" )
+    else
+      __sm_variables_nonempty+=( "${_variable}" )
+    fi
+  done
+}
+
+__sm.variables.must.be.nonempty()
+{
+  trace_filter variables || set -o xtrace
+  typeset _error IFS
+  _error="$1"
+  IFS=','
+  shift
+
+  __sm.variables.filter "$@"
+
+  if (( ${#__sm_variables_empty[@]} ))
+  then
+    ${_error} "Variables '${__sm_variables_empty[@]}' are suposed to be not empty but are not."
+  fi
+}
+
+__sm.variables.must.be.empty()
+{
+  trace_filter variables || set -o xtrace
+  typeset _error IFS
+  _error="$1"
+  IFS=','
+  shift
+
+  __sm.variables.filter "$@"
+
+  if (( ${#__sm_variables_nonempty[@]} ))
+  then
+    ${_error} "Variables '${__sm_variables_nonempty[@]}' are suposed to be empty but are not."
+  fi
+}

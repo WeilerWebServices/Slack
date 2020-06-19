@@ -1,0 +1,10 @@
+api/environment
+api/extensions/manipulation
+api/filesystem
+api/os
+api/config
+api/templates
+api/user
+api/variables
+api/config
+api/vcs

@@ -1,0 +1,109 @@
+#!/bin/sh
+
+fetch_version()
+{
+  version=$(curl -s "${releases_url}/latest-version.txt" 2>/dev/null) ||
+    __sm.log.fail "Unable to fetch version from ${releases_url}/latest-version.txt"
+}
+
+md5_match()
+{ # TODO: switch this to using system module's os_* DSL
+  typeset _archive _path
+  _archive="$1"
+
+  if command exists md5
+  then
+    read archive_md5 < <( md5 -q "${_archive}" )
+  elif command exists md5sum
+  then
+    read archive_md5 < <( md5sum "${_archive}" )
+    archive_md5="${archive_md5/* = }"
+  else
+    for _path in /sbin /bin /usr/bin /usr/sbin
+    do
+      if [[ -x "${_path}/md5" ]]
+      then
+        read archive_md5 < <( ${_path}/md5 -q "${_archive}" )
+      elif [[ -x "${_path}/md5sum" ]]
+      then
+        read archive_md5 < <( ${_path}/md5sum "${_archive}" )
+        archive_md5="${archive_md5/* = }"
+      fi
+    done
+  fi
+
+  [[ "${archive_md5}" == "${md5}" ]]
+}
+
+install_latest()
+{
+  fetch_version
+  install_release
+}
+
+install_release()
+{
+  archive="$archives_path/sm-${version}.tar.gz"
+
+  md5=$(curl -s "${releases_url}/sm-${version}.tar.gz.md5" 2>/dev/null)
+
+  if files exist "${archive}" && ! md5_match
+  then
+    # Remove old installs, if they exist and have incorrect MD5 checksums.
+    files exist "$archives_path/sm-${version}.tar.gz" &&
+      rm -f "$archives_path/sm-${version}.tar.gz"
+  fi
+
+  paths create "${archives_path}"
+
+  #TODO make use of fetch_uri
+  curl -s -L "${releases_url}/sm-${version}.tar.gz" -o "$archive"
+
+  # TODO: shasum default instead
+  [[ "$(files md5 "${archive}")" == "${md5}" ]] ||
+    __sm.log.fail "
+Archive package downloaded does not match its calculated MD5 checksum ${md5}:
+
+  $archives_path/sm-${version}.tar.gz
+
+Please retry the installation, and/or check your networking setup.
+
+Halting installation.
+"
+
+  tar zxf "${archives_path}/sm-${version}.tar.gz" -C "$src_path/"
+
+  paths enter "$src_path/sm-${version}"
+
+  ensure_files_are_executable "install"
+
+  "${PWD}/install"
+}
+
+install_remote()
+{
+  typeset remote
+  remote="${1:-sm}"
+  install_sm_scm "$(scm_identifier "$remote")" "$remote"
+}
+
+install_sm_scm()
+{
+  typeset remote dir repo
+  remote="origin"
+  dir="${1}"
+  repo="${2:-sm}"
+
+  __sm.includes api/vcs
+
+  __sm.string.ematch "${repo}" "^[[:alnum:]_-]+\/[[:alnum:]_-]+$" || repo="${repo}/sm"
+
+  # TODO: This should update to/from repos path and/or archives path...
+  fetch_uri "${repo}" "${src_path}/${dir}"
+
+  paths enter "${src_path}/${dir}/"
+
+  chmod 0755 ${PWD}/install ${PWD}/bin/*
+
+  exec bash ${PWD}/install --trace="$trace_flags" --debug="$debug_flags"
+}

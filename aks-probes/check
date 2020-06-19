@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+if [ -z "${TARGET_HOSTNAME}" ]; then
+	echo "TARGET_HOSTNAME required" && exit 1
+fi
+
+export TARGET_PORT=${TARGET_PORT:=22}
+export TARGET_TIMEOUT=${TARGET_TIMEOUT:=5}
+
+checks/dns
+checks/tunnelgateway

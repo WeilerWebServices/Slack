@@ -1,0 +1,63 @@
+#!/bin/sh
+
+#
+# SM config API
+#
+# config read key {key} file {file} [<into|as> {variable}] [prefix {prefix}]
+# config write key {key} value {value} file {file}
+#
+config()
+{
+  trace_filter config || set -o xtrace
+  typeset _token _command _file _key _value _variable _prefix _extension
+
+  while (( $# ))
+  do
+    _token="$1" && shift
+    case "${_token}" in
+      (read|write)
+        _command="${_token}"
+        ;;
+      (key)
+        _key="$1"
+        (( $# )) && shift || __sm.log.fail "a key must be given after keywords 'key'"
+        ;;
+      (value)
+        _value="$1"
+        (( $# )) && shift || __sm.log.fail "a value must be given after keywords 'value'"
+        ;;
+      (into|as)
+        _variable="$1"
+        (( $# )) && shift || __sm.log.fail "a variable name must be given after keywords 'into|as'"
+        ;;
+      (prefix) # TODO: Nix prefix?
+        _prefix="$1"
+        (( $# )) && shift || __sm.log.fail "a prefix name must be given after keyword 'prefix'"
+        ;;
+      (file)
+        _file="$1"
+        (( $# )) && shift || __sm.log.fail "a file name must be given after keyword 'file'"
+        ;;
+      (from)
+        _extension="$1" || __sm.log.fail "An extension name must follow keyword 'for'"
+        ;;
+    esac
+  done
+
+  case "${_command}" in
+    (read)
+      [[ -n "${_file}" ]] || __sm.log.fail "File name must be given (file {filename})."
+      [[ -n "${_key}" ]]  || __sm.log.fail "key name must be given (key {keyname})."
+      __sm.config.read "${_extension}" "${_file}" "${_key}" "${_variable}" "${_prefix}"
+      ;;
+    (write)
+      [[ -n "${_file}" ]]  || __sm.log.fail "File name must be given (file {filename})."
+      [[ -n "${_key}" ]]   || __sm.log.fail "key name must be given (key {keyname})."
+      [[ -n "${_value}" ]] || __sm.log.fail "value must be given (value {valuename})."
+      __sm.config.write "${_extension}" "${_file}" "${_key}" "${_value}"
+      ;;
+    (*)
+      __sm.log.fail "Unknown command '${_command}'"
+      ;;
+  esac
+}

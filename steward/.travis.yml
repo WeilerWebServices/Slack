@@ -1,0 +1,21 @@
+language: generic
+branches:
+  only:
+  - master
+cache:
+  directories:
+  - vendor
+services:
+- docker
+sudo: required
+install:
+- make bootstrap
+script:
+- make test-cover docker-build
+deploy:
+  provider: script
+  script: _scripts/deploy.sh
+  on:
+    branch: master
+after_success:
+- bash <(curl -s https://codecov.io/bash)

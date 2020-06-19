@@ -1,0 +1,114 @@
+#!/bin/sh
+
+#
+# user is root user {username}
+# user is not root user {username}
+# user is privileged user {username}
+# user is unprivileged user {username}
+# user set home {home} for {username}
+# user set shell {shell} for {username}
+# user create unless exists name {username}
+# user exists name {username}
+#
+
+user()
+{
+  trace_filter users || set -o xtrace
+
+  typeset _command _subcommand _user _group _source _flags _value _shell __user_commands
+  _flags=()
+  __user_commands=(
+    "is root"
+    "is not root"
+    "is privileged"
+    "is unprivileged"
+    "set home"
+    "set shell"
+    "create unless exists"
+    "create=add"
+    "delete=remove"
+  )
+
+  if __sm.command.detect "$*" "${__user_commands[@]}"
+  then
+    _command="${__sm_command_dotted}"
+    shift "${__sm_command_words}"
+  else
+    __sm.log.fail "No command given.\nUsage:  \nextension <command> ..."
+  fi
+
+  case "${_command}" in
+    (set.home)
+      _value="$1"
+      (( $# )) && shift || __sm.log.fail "A home path must follow keyword 'home';"\
+        "user set home /home/{username} for {username}"
+      ;;
+    (set.shell)
+      _value="$1"
+      (( $# )) && shift || __sm.log.fail "A shell must follow keyword 'shell'"\
+        "user set shell /bin/zsh for {username}"
+      ;;
+    (exists)
+      _user="$1"
+      (( $# )) && shift || __sm.log.fail "A user name must follow keyword 'exists'"\
+        "user exists {username}"
+      ;;
+  esac
+
+  while (( $# > 0 ))
+  do
+    _token="$1" && shift
+    case "${_token}" in
+      (login)
+        _flags+=( - )
+        ;;
+      (name|user|for)
+        _user="$1"
+        (( $# )) && shift || __sm.log.fail "User name must follow keyword 'user'"
+        ;;
+      (group)
+        _group="${1:-}"
+        (( $# )) && shift || __sm.log.fail "Group name must follow keyword 'group'"
+        ;;
+      (from)
+        _source="${1:-}"
+        (( $# )) && shift || __sm.log.fail "from source name must follow keyword 'from'"
+        ;;
+      (shell)
+        _shell="${1:-}"
+        (( $# )) && shift || __sm.log.fail "A user shell (/bin/{zsh,bash}) must follow keyword 'shell'"
+        ;;
+      (force)
+        _flags+=(-f)
+        ;;
+      (*)
+        __sm.log.fail "Unhandled token '${_token}'"
+        ;;
+    esac
+  done
+
+  case "${_command}" in
+    (is.*)
+      if __sm.user.${_command} ; then return 0 ; else return 1 ; fi
+      ;;
+    (home)
+      __sm.user.${_command} ${_user} ${_home}
+      ;;
+    (shell)
+      __sm.user.${_command} ${_user} ${_shell}
+      ;;
+    (set.*)
+      __sm.user.${_command} ${_user} ${_value}
+      ;;
+    (add|create.unless.exists)
+      __sm.user.${_command} "${_user}" "${_group}" "${_flags[*]}"
+      ;;
+    (remove)
+      __sm.user.${_command} "${_user}" "${_flags[*]}"
+      ;;
+    (*)
+      __sm.log.fail "Unknown command '${_command}'"
+      ;;
+  esac
+}
+

@@ -1,0 +1,6 @@
+imageTag: 1.4.29
+
+# number of memcache Pods to run
+memcacheReplicas: 3
+# memory limit for each instance
+memcacheMemory: 128

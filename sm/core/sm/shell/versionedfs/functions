@@ -1,0 +1,395 @@
+#!/bin/sh
+
+#
+# SM Framework Core Module ~ Versioned FileSystem (versionedfs)
+#
+# API Version: 1.0.0
+#
+# versionedfs \
+#   path "{versionedfs root path}" \
+#   strategy "{fhs,name}" \
+#   method "{link,copy}" \
+#   activate "{newest,first}"
+#
+# Example: (package module)
+#
+# versionedfs \
+#   path /opt/sm/pkg \
+#   strategy fhs \
+#   method link \
+#   activate first
+#
+# FileSystem structure:
+#
+# {versionedfs_path}/
+#   .versionedfs/
+#     strategy # contains one of {fhs,name}
+#     method   # contains one of {link,copy}
+#     activate # contains one of {newest,first}
+#     retain   # contains one of {[[:digit:]],all}
+#
+#   versions/
+#     {name}/{version}/ # For each {name}:{version} pair added.
+#
+# If strategy is 'fhs' then,
+#   active/
+#     {bin,sbin,lib,libexec,usr,var,tmp}
+#
+# If strategy is 'name' then,
+#   active/
+#     {name} # For each active name.
+#
+# In both cases if method is 'link' then each entry will be a symlink
+# otherwise each entry will be copied files/directories.
+#
+versionedfs()
+{
+  trace_filter versionedfs || set -o xtrace
+
+  typeset _token _path _paths _source _name _version _strategy _method _activate _action
+  _action="${1:-}"
+  (( $# )) && shift || __sm.log.fail "Usage: versionedfs path \"{versionedfs root path}\" "\
+    "strategy \"{fhs,name}\" method \"{link,copy}\" activate \"{newest,first}\""
+
+  while (( $# ))
+  do
+    _token="${1}" && shift
+    case "${_token}" in
+      (path)
+        _path="${1}"
+        (( $# )) && shift || __sm.log.fail "versionedfs path must follow keyword 'path'"
+        ;;
+      (source)
+        _source="${1}"
+        (( $# )) && shift || __sm.log.fail "Source path must follow keyword 'source'"
+        ;;
+      (name)
+        _name="${1}"
+        (( $# )) && shift || __sm.log.fail "Name must follow keyword 'name'"
+        ;;
+      (version)
+        _version="${1}"
+        (( $# )) && shift || __sm.log.fail "Version string must follow keyword 'version'"
+        ;;
+      (strategy)
+        _strategy="${1}"
+        (( $# )) && shift || __sm.log.fail "Strategy string must follow keyword 'strategy'"
+        case "${_strategy}" in
+          (fhs|name) true ;;
+          (*) __sm.log.fail "Strategy must be one of {fhs,name}" ;;
+        esac
+        ;;
+      (method)
+        _method="${1}"
+        (( $# )) && shift || __sm.log.fail "method string must follow keyword 'method'"
+        case "${_method}" in
+          (link|copy) true ;;
+          (*) __sm.log.fail "Method must be one of {link,copy}" ;;
+        esac
+        ;;
+      (activate)
+        _activate="${1}"
+        (( $# )) && shift || __sm.log.fail "activate string must follow keyword 'activate'"
+        case "${_activate}" in
+          (first|newest) true ;;
+          (*) __sm.log.fail "Activate must be one of {first,newest}" ;;
+        esac
+        ;;
+      (keep)
+        _keep="${1}"
+        (( $# )) && shift || __sm.log.fail "keep number must follow keyword 'activate'"
+        case "${_keep}" in
+          (+([[:digit:]]))
+            (( _keep > 0)) || __sm.log.fail "Keep must be a positive integer." ;;
+          (*) __sm.log.fail "Keep must be an integer." ;;
+        esac
+        ;;
+      (*)
+        __sm.log.fail "Unknown parameter '${_token}'"
+    esac
+  done
+
+  [[ -n "${_path}" ]] || __sm.log.fail "A versionedfs root path must be given."
+
+  [[ "${_action}" == create || -d "${_path}/.versionedfs" ]] ||
+    __sm.log.fail "${_path} is not a versionedfs root path; "\
+    "Use 'versionedfs create path {path}' to initialize."
+
+  case "${_action}" in
+    (create)
+      __sm.versionedfs.create "${_path}"
+      ;;
+    (add)
+      [[ -n "${_name}" && -n "${_source}" ]] ||
+        __sm.log.fail "Name and Source must be given."
+      [[ -n "${_version}" ]] || _version="$(date +"%Y%m%d%H%M%S")"
+      __sm.versionedfs.add "${_path}" "${_name}" "${_version}" "${_source}"
+      ;;
+    (activate)
+      [[ -n "${_name}" && -n "${_version}" ]] ||
+        __sm.log.fail "Name and Version must be given."
+      __sm.versionedfs.activate "${_path}" "${_name}" "${_version}"
+      ;;
+    (remove|deactivate)
+      [[ -n "${_name}" ]] || __sm.log.fail "Name must be given."
+      __sm.versionedfs.${_action} "${_path}" "${_name}" "${_version}"
+      ;;
+    (versions|active)
+      __sm.versionedfs.list "${_action}" "${_path}" "${_name}" "${_version}"
+      ;;
+    (*)
+      __sm.log.fail "Unknown versionedfs action '${_action}'"
+      ;;
+  esac
+}
+
+__sm.versionedfs.create()
+{
+  typeset _path
+  _path="$1"
+  mkdir -p "${_path}/"{.versionedfs,versions,active} ||
+    __sm.log.fail "Could not create paths ${_path}/{.versionedfs,versions,active}"
+
+  echo "${_strategy}" > "${_path}/.versionedfs/strategy"
+  echo "${_method}"   > "${_path}/.versionedfs/method"
+  echo "${_activate}" > "${_path}/.versionedfs/activate"
+
+}
+
+__sm.versionedfs.add()
+{
+  typeset _path _name _version _source _version_path
+  _path="$1"
+  _name="$2"
+  _version="${3}"
+  _source="$4"
+  _version_path="${_path}/versions/${_name}/${_version}"
+
+  if [[ -d "${_version_path}" ]]
+  then
+    rm -rf "${_version_path}"
+  fi
+
+  mkdir -p "${_version_path}"
+
+  if [[ "${_version_path}" != "${_source}" ]]
+  then
+    cp -Rf "${_source}"/* "${_version_path}"
+    printf "${_source}\n" > "${_version_path}/.uri"
+  fi
+}
+
+__sm.versionedfs.remove()
+{
+  typeset _path _name _version _version_path
+  _path="$1"
+  _name="${2}"
+  _version="${3}"
+  _version_path="${_path}/versions/${_name}/${_version}"
+
+  __sm.versionedfs.deactivate "${_path}" "${_name}" "${_version}"
+
+  if [[ -d "${_version_path}" ]]
+  then
+    rm -rf "${_version_path}/"
+  fi
+}
+
+__sm.versionedfs.activate()
+{
+  typeset _path _name _version _target _version_path _active_path _activate \
+    _active_version_path _index _count _files
+  _path="$1"
+  _name="${2}"
+  _version="${3}"
+  _version_path="${_path}/versions/${_name}/${_version}"
+  _active_path="${_path}/active"
+
+  if [[ -L "${_path}/versions/${_name}/active" ]]
+  then # Deactivate if active version.
+#    if [[ "$(readlink "${_path}/versions/${_name}/active")" != "${_version_path}" ]]
+#    then
+      __sm.versionedfs.deactivate "${_path}" "${_name}"
+#    else
+#      return 0 # Success if the given name/version is already active.
+#    fi
+  fi
+
+  _index=0
+  read -r _activate < "${_path}/.versionedfs/activate"
+
+  if [[ -L "${_path}/versions/${_name}/active" ]]
+  then
+    _active_version_path="$(readlink "${_path}/versions/${_name}/active")"
+    case "${_activate}" in
+      (first)
+        [[ -z "${_active_version_path}" ]] || return 0 # a version is already active
+        ;;
+      (newest)
+        true # continue with activation
+        ;;
+    esac
+  fi
+
+  read -r _strategy < "${_path}/.versionedfs/strategy"
+  read -r _method < "${_path}/.versionedfs/method"
+
+  __sm.log.step "${_name} ${_version}"
+
+  case "${_strategy}" in
+    (fhs)
+      case "${_method}" in
+        (link)
+          # TODO: Switch this to using shell globbing builtin?
+          _files=($( find "${_version_path}" -mindepth 1 ))
+          _count="${#_files[@]}"
+          for _file in "${_files[@]}"
+          do
+            : $(( _index++ ))
+            printf "\r  [ ] ${_name} ${_version} ~ linking (${_index}/${_count})..."
+            _target="${_active_path}/${_file##${_version_path}/}"
+            if [[ -d "${_file}" ]]
+            then
+              mkdir -p "${_target}"
+            else
+              if [[ -f "${_target}" ]]
+              then
+                rm -rf "${_target}"
+              fi
+              ln -s "${_file}" "${_target}"
+            fi
+          done
+          printf "\r  [o] %-40s" "${_name} ${_version}"
+          ;;
+        (copy)
+          cp -Rf "${_version_path}"/* "${_active_path}"
+          ;;
+      esac
+      printf "${_version_path}\n" > "${_active_path}/.uri"
+      ;;
+    (name)
+      if [[ -d "${_active_path}/${_name}" ]]
+      then
+        rm -rf "${_active_path}/${_name}"
+      fi
+      mkdir -p "${_active_path}/${_name}"
+      cp -Rf "${_version_path}"/* "${_active_path}/${_name}"
+      printf "${_version_path}\n" > "${_active_path}/${_name}/.uri"
+      ;;
+  esac
+
+  __sm.log.step success
+
+  ln -sf "${_version_path}" "${_path}/versions/${_name}/active"
+  # TODO: Add to active 'db'
+}
+
+__sm.versionedfs.deactivate()
+{
+  typeset _path _name _version _name_path _active_path _index _files _count \
+    _version_path _target _targets
+  _path="$1"
+  _name="${2}"
+  _version="${3:-}"
+  _name_path="${_path}/versions/${_name}"
+  _active_path="${_path}/active"
+
+  [[ -L "${_path}/versions/${_name}/active" ]] || return 0 # No active version
+
+  _index=0
+  _version_path="$(readlink "${_path}/versions/${_name}/active")"
+
+  if [[ -n "${_version}" && "${_version_path}" == "${_name_path}/${_version}" ]]
+  then
+    __sm.log.debug package "A different version than the one given is active; Skipping deactivation."
+    return 0 #
+  fi
+
+  read -r _strategy < "${_path}/.versionedfs/strategy"
+
+  case "${_strategy}" in
+    (fhs)
+      # TODO: Switch this to using shell globbing builtin?
+      _files=($( find "${_version_path}" -mindepth 1 | sort -r ))
+      _count="${#_files[@]}"
+      echo
+      for _file in "${_files[@]}"
+      do
+        : $(( _index++ ))
+        printf "\r  Removing (${_index}/${_count})"
+        _target="${_active_path}/${_file##${_version_path}}"
+        if [[ -L "${_target}" ]]
+        then
+          rm -f "${_target}"
+        elif [[ -d "${_target}" ]]
+        then
+          _targets=( "${_target}"/* )
+          if (( ! ${#_targets[@]} ))
+          then
+            rm -rf "${_target}"
+          fi
+        elif [[ -f "${_target}" ]]
+        then
+          __sm.log.fail "Unknown file type for ${_target}."
+        fi
+      done
+      ;;
+    (name)
+      rm -rf "${_active_path}/${_name}/"
+      ;;
+  esac
+
+  rm -f "${_path}/versions/${_name}/active"
+  # Remove from active metadata
+}
+
+__sm.versionedfs.list()
+{
+  typeset _method _path _name __path __name __version
+  _method=$1
+  _path="$2"
+  _name="${3:-}"
+
+  if [[ -n "${_name}" ]]
+  then
+    _name="${_name//,/ }"
+  fi
+
+  for __path in ${_path}/versions/*/*
+  do
+    __version="${__path##*/}"
+    case "${_method}" in
+      (active)
+        if [[ "${__version}" == "active" && -L "${__path}" ]]
+        then
+          __path="$( readlink "${__path}" )"
+          __version="${__path##*/}"
+        else
+          __version=""
+        fi
+        ;;
+      (versions)
+        if [[ "${__version}" == "active" ]]
+        then
+          __version=""
+        fi
+        ;;
+    esac
+
+    if [[ -n "${__version}" ]]
+    then
+      __name="${__path%/*}"
+      __name="${__name##*/}"
+      if [[ -n "${_name}" ]] && ! __sm.string.contains "${__name}" "${_name}"
+      then
+        __name=""
+      fi
+
+      if [[ -n "${__name}" ]]
+      then
+        printf "${__name}:${__version}\n"
+      fi
+    fi
+  done
+}
+

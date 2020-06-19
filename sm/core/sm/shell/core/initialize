@@ -1,0 +1,153 @@
+#!/bin/sh
+
+# The following shell options must be enabled for the SM Framework.
+setopt EXTENDED_GLOB NULL_GLOB HASH_CMDS WARN_CREATE_GLOBAL
+
+saved_sm_path="${sm_path:-"/sm"}"
+
+# Load SM Framework configuration files, if they exist.
+for file in /etc/smrc "$HOME/.smrc"
+do
+  if [[ -s "${file}" ]]
+  then
+    previous_preload_modules=( "${preload_modules[@]}" )
+    source "${file}"
+    preload_modules=( "${previous_preload_modules[@]}" "${preload_modules[@]}" )
+  fi
+done
+unset previous_preload_modules
+
+sm_path="${saved_sm_path}"
+
+if (( UID == 0 ))
+then # FHS
+  true \
+    "${var_path:="/var"}" \
+    "${etc_path:="/etc"}" \
+    "${profile_path:="/etc/profile"}" \
+    "${profile_d_path:="/etc/profile.d"}"
+else
+  true \
+    "${var_path:="${sm_path}/var"}" \
+    "${etc_path:="$HOME/.etc"}" \
+    "${profile_path:="$HOME/.profile"}" \
+    "${profile_d_path:="$HOME/.profile.d"}"
+fi
+
+true \
+  "${__sm_modules_path:="${sm_path}/core/sm/shell"}" \
+  "${templates_path:="${sm_path}/templates"}" \
+  "${src_path:="${sm_path}/src"}" \
+  "${md5_path:="${sm_path}/md5"}" \
+  "${archives_path:="${sm_path}/archives"}" \
+  "${scm_path:="${sm_path}/scm"}" \
+  "${sets_system_path:="${sm_path}/sets"}" \
+  "${exts_system_path:="${sm_path}/exts"}" \
+  "${extensions_src_path:="${src_path}/extensions"}" \
+  "${tmp_path:="${sm_path}/tmp"}" \
+  "${bin_path:="${sm_path}/bin"}" \
+  "${repos_path:="${sm_path}/repos"}" \
+  "${remote:="origin"}" \
+  "${branch:="master"}" \
+  "${language:="shell"}" \
+  "${user:=$USER}" \
+  "${sm_user_path:=$HOME/.sm}" \
+  "${keep_releases:=4}" \
+  "${hooks_flag:=1}" \
+  "${PAGER:="less"}" \
+  "${config_path:="${sm_path}/core/sm/config"}" \
+  "${packages_path:="${sm_path}/pkg"}" \
+  "${active_path:="${packages_path}/active"}" \
+  "${extension_args:=""}" \
+  "${extension_version:="0.0.1"}"
+
+if [[ -n "${ZSH_VERSION:-}" ]]
+then
+  __sm_array_start=1
+else
+  __sm_array_start=0
+fi
+export __sm_array_start
+
+if [[ -z "${sets_user_path}" ]]
+then
+  if [[ -w "${sets_system_path}" ]] || (( UID == 0 ))
+  then
+    sets_user_path="${sets_system_path}"
+  else
+    sets_user_path="${sm_user_path}/sets"
+  fi
+fi
+
+if [[ -z "${exts_user_path}" ]]
+then
+  if [[ -w "${exts_system_path}" ]] || (( UID == 0 ))
+  then
+    exts_user_path="${exts_system_path}"
+  else
+    exts_user_path="${sm_user_path}/exts"
+  fi
+fi
+
+# Make sure preload_includes is an array.
+preload_modules=( ${preload_modules[@]} )
+export preload_modules
+
+if [[ -d "${active_path}/bin" ]]
+then
+  export PATH="${active_path}/bin:${active_path}/sbin:${PATH}"
+fi
+
+export sm_path __sm_modules_path initial_pwd extension_action_calls=0
+
+zmodload zsh/parameter
+
+# Load module() function, then load core modules.
+source "${sm_path}/core/sm/shell/core/functions"
+source "${sm_path}/core/sm/shell/string/functions"
+source "${sm_path}/core/sm/shell/log/functions"
+source "${sm_path}/core/sm/shell/log/initialize"
+source "${sm_path}/core/sm/shell/command/functions"
+source "${sm_path}/core/sm/shell/modules/functions"
+source "${sm_path}/core/sm/shell/versionedfs/functions"
+
+__sm.modules.core.initialize
+
+if [[ "$OSTYPE" == *solaris* ]]
+then # custom compilations + g*
+  export PATH="/bin:/opt/local/bin:/usr/sfw/bin:/usr/sbin:/usr/bin:${PATH}"
+fi
+
+# Ensure that any variables you wish export to extensions actually *are* exported.
+__sm.exports
+
+if [[ -n $sm_script ]]
+then
+  if [[ "$sm_script" == "/" ]] # Leave this until we can properly detect source vs shebang
+  then # Sourcing needed for loading from bash 3, for now, set sm_script='/'
+    true # Skip any actions, stop with the framework simply loaded.
+  else
+    __sm.actions.source $sm_script "${extension_args[@]}" # load script
+  fi
+elif [[ -n "${call_action}" ]]
+then
+  if __sm.command.is.function "${call_action}"
+  then
+    __sm.actions.call ${call_action} "${extension_args[@]}"
+  else
+    __sm.log.error "${call_action} is not a valid function name"
+  fi
+elif set | grep '^extension_args=(' >/dev/null
+then
+  case "${extension_args[*]}" in
+    (*,*)
+      ${sm_path}/bin/smp ${extension_args[@]}
+      ;;
+    (*)
+      __sm.includes sm/modules api/extensions/detection api/extensions/execution
+      __sm.extension.action
+      __sm.extension.actions.type
+      __sm.extension.run
+  esac
+fi
+

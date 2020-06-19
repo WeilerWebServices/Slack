@@ -1,0 +1,28 @@
+#!/bin/sh
+
+set -e
+
+echo "======================================================================"
+env
+echo "======================================================================"
+
+if [[ ! -d ${CONSUL_DATA_DIR} ]]; then
+        mkdir -p ${CONSUL_DATA_DIR}
+fi
+
+set -x # let's see the invocation!
+
+if [[ ${CONSUL_AGENT_MODE} == "server" ]]; then
+        /app/consul agent \
+                -server \
+                -retry-join ${CONSUL_DISCOVERY_ADDRESS} \
+                -bootstrap-expect ${CONSUL_BOOTSTRAP_SIZE} \
+                -data-dir ${CONSUL_DATA_DIR}
+elif [[ ${CONSUL_AGENT_MODE} == "client" ]]; then
+        /app/consul agent \
+                -retry-join ${CONSUL_DISCOVERY_ADDRESS} \
+                -data-dir ${CONSUL_DATA_DIR}
+else
+        echo "Unknown CONSUL_AGENT_MODE: ${CONSUL_AGENT_MODE}, exiting."
+        exit 1
+fi

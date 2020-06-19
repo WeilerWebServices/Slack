@@ -1,0 +1,95 @@
+#!/bin/sh
+
+__sm.extension.path()
+{
+  typeset -g extension_path
+  typeset _path extension
+  extension=$1
+  (( $# )) && shift || __sm.log.fail "Cannot process extension path;"\
+    " No extension name was given."
+
+  for _path in ${extensions_search_paths[@]}
+  do
+    if [[ -d "${_path}/${extension}/bin" || -d "${_path}/${extension}/shell" ]]
+    then
+      extension_path="${_path}/${extension}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+__sm.extension.is.valid()
+{
+  typeset _path
+  _path="${1:-}"
+  (( $# )) && shift || __sm.log.fail "No extension path was given to check validity."
+  [[ -n "${_path}" ]] || __sm.log.fail "Path to the extension was not given."
+  [[ -d "${_path}/bin" || -d "${_path}/shell" ]]
+}
+
+__sm.extension.find()
+{
+  typeset -g extensions_path extension
+  extensions_path="${1:-}"
+  extension="${2:-}"
+
+  (( $# )) && shift || __sm.log.fail "Cannot detect extension existence;"\
+    " No extension path was given."
+
+  (( $# )) && shift || __sm.log.fail "Cannot detect extension existence;"\
+    " No extension name was given."
+
+  __sm.extension.is.valid $extensions_path/$extension
+}
+
+__sm.extension.sets.iterator()
+{
+  typeset _path _command
+  _path="$1"
+  _command="$2"
+  shift 2
+  "${_command}" "${_path}" "$@"
+  return 1
+}
+
+__sm.extension.iterator()
+{
+  typeset _path _command _ext_path
+  _path="$1"
+  _command="$2"
+  shift 2
+  for _ext_path in "${_path}"/*
+  do
+    "${_command}" "${_ext_path}" "$@"
+  done
+  return 1
+}
+
+__sm.extension.get.uri()
+{
+  awk -F= "/^$1=/ {print \$2 }" < "${sm_path}/core/cli/config/known_ext" | tail -n 1
+}
+
+__sm.extension.in()
+{
+  typeset -ga found_extensions
+  typeset _path _extension
+  _path="$1"
+
+  found_extensions=()
+
+  if [[ -d "${_path}" ]]
+  then
+    for _extension in ${_path}/*
+    do
+      if [[ -d "${_extension}/bin" || -d "${_extension}/shell" ]]
+      then
+        found_extensions+=( "${_extension##${_path}\/}" )
+      fi
+    done
+  else
+    __sm.log.debug search "Path '${_path}' does not exist."
+    return 1
+  fi
+}

@@ -1,0 +1,30 @@
+#!/bin/sh
+
+timestamp()
+{
+  trace_filter timestamp || set -o xtrace
+
+  typeset _command _params=() _name _uri __extension_commands
+  _params=()
+  __extension_commands=(
+    "show new"
+    "show current"
+    "save=set"
+  )
+
+  if __sm.command.detect "$*" "${__timestamp_commands[@]}"
+  then
+    _command="${__sm_command_dotted}"
+    shift "${__sm_command_words}"
+  else
+    __sm.log.fail "No command given.\nUsage:\n  timestamp <command> ..."
+  fi
+
+  case "${_command}" in
+    (show.new|show.current|set)
+      if __sm.timestamp.${_command}
+      then return 0 ; else return $? ; fi
+      ;;
+    (*) __sm.log.error "Unknown command for extension '${_command}'."
+  esac
+}

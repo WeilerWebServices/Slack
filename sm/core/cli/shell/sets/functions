@@ -1,0 +1,232 @@
+#!/bin/sh
+
+sets_help()
+{
+  # TODO: Move this to a sets man page.
+  log "BDSM extension sets management
+
+sets List                 # installed sets.
+sets known                # List extension sets that can be installed.
+sets install all          # Install all extension sets found on the known list.
+sets install {name}       # Install extension set {name} found on the known list.
+sets install {name} [uri] # Install extension set {name}, from [uri] if given.
+sets add {name} [uri]     # Shortcut for install.
+sets update all           # Update all extension sets using remembered uris.
+sets update {name}        # Update extension set {name} using remembered uri.
+sets uninstall {name}     # Remove extension set {name}.
+sets rm {name}            # Shortcut for uninstall.
+sets help                 # Show this help.
+"
+
+}
+
+sets_list()
+{
+  typeset _path extensions
+  true ${COLUMNS:=80}
+
+  for _path in "${extensions_search_paths[@]}"
+  do
+    [[ -d "${_path}"  ]] || continue
+
+    if [[ "${_path}" =~ "${sets_system_path}" ]]
+    then
+      log "${_path##${sets_system_path}\/}:"
+    elif [[ "${_path}" =~ "${sets_user_path}" ]]
+    then
+      log "${_path##${sets_user_path}\/}: # User set"
+    elif [[ "${_path}" == "${exts_user_path}" ]]
+    then
+      log "${_path##*\/}: # User set"
+    else
+      log "${_path##$sm_path\/}:"
+    fi
+
+    if __sm.extension.in "$_path"
+    then
+      extensions=( ${found_extensions[@]} )
+      echo ${extensions[@]} | xargs -s ${COLUMNS} | xargs -I '{}' echo "  - {}"
+    else
+      log "  # No extensions in set"
+    fi
+    log ""
+  done
+}
+
+sets_list_known()
+{
+  typeset line
+  true ${COLUMNS:=80}
+  printf "# %18s | %s\n" "Set Name" "Repository"
+
+  while read line
+  do
+    printf "%20s   %s\n" "${line/\=*}" "${line/*\=}"
+  done < "${sm_path}/core/cli/config/known_sets"
+}
+
+sets_install()
+{
+  typeset _name _names _extension_namespace
+  _names="${1:-}"
+  (( $# )) && shift || __sm.log.fail "No set name was given."
+
+  _names=( ${=_names//,/ } )
+  _extension_namespace="${sets_user_path#${sm_path}\/}"
+  _extension_namespace="${_extension_namespace#${sm_user_path}\/}"
+
+  for _name in ${_names[@]}
+  do
+    set_install "${_name}" "$@" || true
+  done
+}
+
+set_install()
+{
+  typeset _name _uri _identifier _version
+  _name="${1:-}"
+  (( $# )) && shift || __sm.log.fail "No set name was given."
+
+  _uri="${1:-}"
+  (( $# )) && shift || _uri=$( awk -F= "/^${_name}=/ {print \$2 }" < "${sm_path}/core/cli/config/known_sets" | tail -n 1 )
+
+  [[ -n "${_uri}" ]] ||
+    __sm.log.error "uri not given and cannot find ${_name} in known extension sets."
+
+  _identifier="$(scm_identifier "${_uri}")"
+
+  _version="head"
+  if [[ "${_name}" == *:* ]]
+  then
+    _version="${_name/*:}"
+  fi
+
+  log step "${_name} ${_version}"
+  if fetch_uri "${_uri}" "${src_path}/${_identifier}" "$@"
+  then
+    versionedfs add \
+      path "${sets_user_path}" name "${_name}" version "${_version}" \
+      source "${src_path}/${_identifier}"
+
+    versionedfs activate \
+      path "${sets_user_path}" name "${_name}" version "${_version}"
+  else
+    return $?
+  fi
+}
+
+sets_install_all()
+{
+  typeset _set _name _uri
+  true ${COLUMNS:=80}
+
+  while read _set
+  do
+    [[ "${line}" != \#* ]] || continue
+    _name="${_set/\=*}"
+    _uri="${_set/*\=}"
+    sets_install "${_name}" "${_uri}" --on-fail true
+  done < "${sm_path}/core/cli/config/known_sets"
+}
+
+sets_update()
+{
+  typeset _name _uri
+  (( $# > 0 )) ||
+    __sm.log.error "Cannot update extension sets without giving their names! "
+
+  for _name in "$@"
+  do
+    if [[ ! -d "${sets_user_path}/active/${_name}" ]]
+    then
+      if __sm.extension.in.paths __sm.extension.find "${_name}"
+      then
+        __sm.log.error "Extension set ${_name} is installed system wide and can not be updated by user."
+      else
+        __sm.log.error "Extension set ${_name} does not exist."
+      fi
+    fi
+
+    if [[ ! -s "${sets_user_path}/active/${_name}/.uri" ]]
+    then
+      __sm.log.warn "Extension set ${_name} does not contain stored uri."
+      continue
+    fi
+
+    _uri=$( __sm.vcs.read_uri "${sets_user_path}/active/${_name}/.uri" )
+
+    if [[ -z "${_uri}" ]]
+    then
+      __sm.log.warn "Extension set ${_name} does not contain stored uri."
+    else
+      sets_install "${_name}" "${_uri}"
+    fi
+  done
+}
+
+sets_update_all()
+{
+  typeset _name _sets
+  _sets=( "${sets_user_path}"/active/* )
+
+  if (( ! ${#_sets[@]} ))
+  then
+    __sm.log.error "No extension sets found for update."
+  fi
+
+  for _name in "${_sets[@]}"
+  do
+    [[ -d "${_name}"  ]] || continue
+    sets_update "${_name##*/}"
+  done
+}
+
+sets_uninstall()
+{
+  typeset _name
+  _name="$1"
+  case "${_name}" in
+    */*|.|..)
+      __sm.log.error "Please specify a valid extension name."
+      ;;
+  esac
+
+  if [[ ! -d "${sets_user_path}/active/${_name}" ]]
+  then
+    if __sm.extension.in.paths __sm.extension.find "${_name}"
+    then
+      __sm.log.error "Extension set ${_name} is installed system wide and can not be uninstaled by user."
+    else
+      __sm.log.error "Extension set ${_name} does not exist."
+    fi
+  fi
+
+  versionedfs remove \
+    path "${sets_user_path}" name "${_name}"
+}
+
+sets_check_availability()
+{
+  typeset _set _line _args
+  _args=( $@ )
+
+  # TODO: refactor this to take argument of uri to check instead.
+  #       provide check_known_sets_availability or some such to wrap this.
+  while read _set
+  do
+    case "$line" in
+      (^#)
+        true # Skipt comment lines
+        ;;
+      (*)
+        while read _line
+        do
+          [[ "${_line}" == Status* ]] || continue
+          echo "${_set/\=*}" "${_line/*:}"
+          break
+        done < <(curl -s --head https://github.com/sm/sm-"${_set/\=*}")
+        ;;
+    esac
+  done < "${sm_path}/core/cli/config/known_sets"
+}
+

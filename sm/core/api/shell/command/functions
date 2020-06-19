@@ -1,0 +1,82 @@
+#!/bin/sh
+
+#
+# SM command API
+#
+# command exists {name}
+# command is function {name}
+# command is script {name} # NIY
+# command is binary {name} # NIY
+# command full name {name}
+# command run "command to run"
+# command run as {username} "command to run"
+# command "command" # calls shell builtin 'command'.
+#
+command() { commands "$@" ; }
+
+commands()
+{
+  trace_filter command || set -o xtrace
+  typeset _command _subcommand _token _user _code _flags
+  _flags=()
+
+  while (( $# ))
+  do
+    _token="$1" && shift
+    case "${_token}" in
+      (exists)
+        if __sm.command.exists "${1}" > /dev/null 2>&1
+        then return 0 ; else return 1 ; fi
+        ;;
+      (is)
+        _subcommand="$1"
+        (( $# )) && shift || __sm.log.fail "A command must follow keyword 'is'; <function>"
+        case "${_subcommand}" in
+          (function)
+            if __sm.command.is.function "$1" >/dev/null 2>&1
+            then return 0 ; else return 1 ; fi
+            ;;
+          # (script)
+          # (binary)
+          (*)
+            __sm.log.fail "Unknown command '${1}' following keyword 'is'"
+            ;;
+        esac
+        ;;
+      (full)
+        _subcommand="$1"
+        (( $# )) && shift || __sm.log.fail "A 'command full' must follow keyword 'name'."
+        case "${_subcommand}" in
+          (name)
+            if __sm.command.full.name "$1" >/dev/null 2>&1
+            then return 0 ; else return 1 ; fi
+            ;;
+          (*)
+            (( $# )) && shift || __sm.log.fail "A 'command full' must follow keyword 'name'."
+            ;;
+        esac
+        ;;
+      (run)
+        case "$1" in
+          (as)
+            shift
+            _user="$1"
+            (( $# )) && shift || __sm.log.fail "A user name or id must be specified after keyword 'as'"
+            # TODO: Check to ensure user name/id exists on the system
+            if __sm.command.run.as "${_user}" "${_flags[*]}" "$@"
+            then return 0 ; else return 1 ; fi
+            ;;
+          (*)
+            _command="$1"
+            shift
+            if __sm.command.run "${_command}" "$@"
+            then return 0 ; else return 1 ; fi
+            ;;
+        esac
+        ;;
+      (*)
+        builtin command $1 $@
+        ;;
+    esac
+  done
+}

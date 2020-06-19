@@ -1,0 +1,11 @@
+# local binaries, installers, and artifacts
+tests/tests.test
+tests/example-*/
+
+# vendored go source code
+vendor/
+
+# generated bintray scripts during ci
+_scripts/ci/bintray-ci.json
+
+junit.xml

@@ -1,0 +1,19 @@
+<h1>Hello!</h1>
+
+<h2>Links:</h2>
+
+<ul>
+  <li><a href="/sidekiq">Sidekiq Dashboard</a></li>
+</ul>
+
+<h2>Process</h2>
+
+<pre>
+<%= process_info.to_h.to_yaml %>
+</pre>
+
+<h2>Environment:</h2>
+
+<pre>
+<%= debug ENV.to_h.to_yaml %>
+</pre>

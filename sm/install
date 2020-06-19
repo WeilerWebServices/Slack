@@ -1,0 +1,83 @@
+#!/bin/bash
+
+extension_args=()
+
+if ! command -v zsh >/dev/null
+then
+  echo "ERROR: ZSH is required for SM."
+  exit 1
+fi
+
+while (( $# ))
+do
+  token="$1" && shift
+  case "$token" in
+    (--trace|trace)
+      extension_args+=("--trace=all")
+      ;;
+    (--prefix=*)
+      prefix_path="${token/*\=}"
+      ;;
+    (shell)
+      case "$1" in
+        (bash|zsh)
+          export sm_shell="$1"
+          shift
+          ;;
+        (*)
+          echo "Shell '$1' is not allowed; Shell must be one of {bash,zsh}"
+          ;;
+      esac
+      ;;
+    (--prefix|prefix)
+      prefix_path="$1"
+      if ! shift
+      then
+        echo "ERROR: A prefix path must be followed by keyword 'prefix'."
+        exit 1
+      fi
+      ;;
+    (DESTROOT=)
+      DESTROOT="${token/*\=}"
+      ;;
+    (DESTROOT)
+      DESTROOT="$1"
+      if ! shift
+      then
+        echo "ERROR: A DESTROOT path must be followed by keyword 'DESTROOT'."
+        exit 1
+      fi
+      ;;
+    (*)
+      extension_args+=("$token")
+      ;;
+  esac
+done
+
+if [[ -n "${prefix_path}" ]]
+then
+  sm_path="${DESTROOT:-}${prefix_path}/sm"
+
+elif [[ -z "${sm_path:-}" ]]
+then
+  if (( UID ))
+  then
+    sm_path="${DESTROOT:-}$HOME/.sm"
+  else
+    sm_path="${DESTROOT:-}/opt/sm"
+  fi
+fi
+
+# set BDSM basic paths
+install_path="${sm_path}" # Path to install everything to.
+archives_path="${sm_path}/archives"
+scm_path="${sm_path}/scm"
+src_path="${sm_path}/src"
+sets_user_path="${sm_path}/sets"
+exts_user_path="${sm_path}/exts"
+
+export sm_path install_path archives_path scm_path src_path \
+  sets_user_path DESTROOT
+
+exec "${PWD}/local" --call=install/install_sm "${extension_args[@]}"
+

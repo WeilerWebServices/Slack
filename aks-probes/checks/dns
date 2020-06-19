@@ -1,0 +1,8 @@
+#!/bin/sh
+
+output=$(nslookup "${TARGET_HOSTNAME}")
+
+if [ $? -eq 1 ]; then
+	echo "Failed to resolve hostname ${TARGET_HOSTNAME} output: ${output}"
+	exit 12
+fi

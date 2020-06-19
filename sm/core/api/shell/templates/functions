@@ -1,0 +1,79 @@
+#!/bin/sh
+
+# TODO: Rework this into a 1.0.0 module API
+
+#
+#    user$ templates install "nginx.conf" \
+#            to "${nginx_path}/nginx.conf" \
+#            mode 0644 owner "${nginx_user}"
+#
+#    user$ templates seed "/etc/conf.d/${extension}.conf" \
+#            prefix_path "${prefix_path}" \
+#            init_scripts_path "${init_scripts_path}" \
+#            data_path "${data_path}" \
+#            confd_path "${confd_path}" \
+#            extension "${extension}"
+#
+# Note that if you wish to eliminate all unset strings, pass the pair
+#     ".*" ""
+# as the last pair of arguments to templates seed.
+#
+template() { templates "$@" ; }
+templates()
+{
+  trace_filter templates || set -o xtrace
+
+  typeset _command _name _target _source _mode _owner _template _params __templates_commands _token
+  _source="${extension_templates_path}" \
+  _mode=0644
+  _owner=$USER
+  _params=()
+  __templates_commands=(
+    "exists=exist"
+  )
+
+  if __sm.command.detect "$*" "${__templates_commands[@]}"
+  then
+    _command="${__sm_command_dotted}"
+    shift "${__sm_command_words}"
+  else
+    __sm.log.fail "No command given.\nUsage:  \npaths <command> ..."
+  fi
+
+  _name="$1"
+  (( $# )) && shift || __sm.log.fail "Template name was not given"
+
+  while (( $# > 0 ))
+  do
+    _token="${1}" && shift
+    case "${_token}" in
+      (to)
+        _target="$1"
+        (( $# )) && shift || __sm.log.fail "target path must follow keyword 'to'"
+        ;;
+      (mode)
+        _mode="$1"
+        (( $# )) && shift || __sm.log.fail "mode must follow keyword 'mode'"
+        ;;
+      (owner)
+        _owner="$1"
+        (( $# )) && shift || __sm.log.fail "owner must follow keyword 'owner'"
+        ;;
+      (from)
+        __sm.log.fail "'from' keyword is no longer supported"
+        ;;
+      (*)
+        _params+=("${_token}")
+    esac
+  done
+
+  case "${_command}" in
+    (exist|install|seed|update)
+      __sm.templates.${_command} "${_name}" "${_params[@]}"
+      ;;
+    (*)
+      __sm.log.fail "Unknown command '${_command}' for templates API."
+      ;;
+  esac
+}
+

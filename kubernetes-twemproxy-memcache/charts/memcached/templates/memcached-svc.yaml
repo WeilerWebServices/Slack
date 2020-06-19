@@ -1,0 +1,17 @@
+## Headless Kubernetes Service to force Pod spread and provide member discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "%s-%s" .Release.Name "memcached" | trunc 24 }}
+  labels:
+    provider: memcached
+    release: {{ .Release.Name | quote }}
+spec:
+  clusterIP: None
+  selector:
+    provider: memcached
+    release: {{ .Release.Name | quote }}
+  ports:
+    - name: memcache
+      port: 11211
+      protocol: TCP

@@ -1,0 +1,33 @@
+#!/bin/sh
+
+__sm.step.start()
+{
+  typeset -ga steps_started
+  steps_started+=( "$1" )
+}
+
+__sm.steps.retreat()
+{
+  typeset -ga steps_started
+  typeset step
+
+  if [[ -z "${steps_started}" ]]
+  then
+    steps_started=( "$@" )
+  fi
+
+  while (( ${#steps_started} ))
+  do
+    array pop steps_started step
+    if command exists "fail_${step}"
+    then
+      "fail_${step}"
+    fi
+
+    if command exists after_step
+    then
+      after_step "fail_${step}"
+    fi
+  done
+}
+

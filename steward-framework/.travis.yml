@@ -1,0 +1,16 @@
+language: generic
+branches:
+  only:
+  - master
+cache:
+  directories:
+  - vendor
+services:
+- docker
+sudo: required
+install:
+- make bootstrap
+script:
+- make test-cover
+after_success:
+- bash <(curl -s https://codecov.io/bash)

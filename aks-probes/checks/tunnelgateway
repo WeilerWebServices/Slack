@@ -1,0 +1,9 @@
+#!/bin/sh
+
+output=$(nc -w "${TARGET_TIMEOUT}" -z "${TARGET_HOSTNAME}" "${TARGET_PORT}")
+
+if [ $? -eq 1 ]; then
+	echo "Failed to connect to hostname ${TARGET_HOSTNAME} on port ${TARGET_PORT}. Output: ${output}"
+	exit 11 
+fi
+

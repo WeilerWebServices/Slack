@@ -1,0 +1,150 @@
+#!/bin/sh
+
+#
+# SM Process API
+#
+# process run "command to run"
+# echo $process_pid # this will be set to the command's pid
+#
+# process on exit "some commands to run"
+#
+# if process is running pid $pid
+# then ...
+#
+# if process is running pidfile $pid_file
+# then ...
+#
+# process status pid $pid
+#
+# process status name postgresql pid $pid
+#
+# process status name nginx pidfile /var/run/nginx/nginx.pid
+#
+# process signal $signal pidfile $pid_file
+# process signal $signal pid $pid
+# process $signal pid $pid
+# process $signal pidfile $pid_file
+#
+#   where "signal" is one of (all upper or lower case):
+#     kill,quit,term,usr2,usr2,ttin,ttou,winch,hup
+#     OR a hyphen followed by a number ex: "-15"
+#
+# Example:
+#   process signal hup 1234
+#   process signal hup pidfile /var/run/nginx/nginx.pid
+#   process term pidfile $HOME/shared/pids/unicorn.pid
+#
+# while : ; do
+#   if process lock lockfile /var/run/myprocess.lock
+#   then ... # Obtained the lock, continue!
+#   fi
+# done
+#
+process()
+{
+  trace_filter process || set -o xtrace
+  typeset _token _command _process _command _user _flags __process_commands _signal _pid _name _file
+  _pid=0
+
+  __process_commands=(
+  "on exit=exit"
+  "is running=running"
+  )
+
+  if __sm.command.detect "$*" "${__process_commands[@]}"
+  then
+    _command="${__sm_command_dotted}"
+    shift "${__sm_command_words}"
+  else
+    __sm.log.fail "No command given.\nUsage:  \npaths <command> ..."
+  fi
+
+  while (( $# ))
+  do
+    _token="$1" && shift
+    case "${_token}" in
+      (name)
+        _name="$1"
+        shift || fail "Process name must be given after keyword 'name'"
+        ;;
+      (pid)
+        _pid=$1
+        shift || fail "Process id (pid) must be given after keyword 'pid'"
+        ;;
+      (pidfile|lockfile)
+        _file="$1"
+        shift || fail "File path/name must follow keyword '${_token}'"
+        ;;
+      (status|signal|lock)
+        _command="${_token}"
+        ;;
+      (+([[:digit:]]))
+        _pid=${_token}
+        ;;
+      (kill|KILL|quit|QUIT|term|TERM|usr1|USR1|usr2|USR2|ttin|TTIN|ttou|TTOU|winch|WINCH|hup|HUP|-+([[:digit:]]))
+        _command=signal
+        _signal=${_token}:u
+        ;;
+      (*.pid)
+        _file="${_token}"
+        ;;
+      (*)
+        __sm.log.fail "Unknown token '${_token}'"
+        ;;
+    esac
+  done
+
+  case "${_command}" in
+    (signal)
+      if ! (( _pid ))
+      then
+        __sm.log.fail "pid to signal must be given;"\
+          " please check your code (see trace below.)"
+      fi
+
+      case "${_signal}" in
+        (KILL|QUIT|TERM|USR1|USR2|TTIN|TTOU|WINCH|HUP|+([[:digit:]]))
+          __sm.process.signal ${_signal} ${_pid}
+          ;;
+        (*)
+          __sm.log.fail "Cannot signal service;"\
+            " Signal must be given as the first parameter and be one of:"\
+            " {KILL,QUIT,TERM,USR1,USR2,TTIN,TTOU,a digit})."
+          ;;
+      esac
+      ;;
+    (status)
+      if [[ -n "${_file}" || -n "${_pid}" ]]
+      then
+        __sm.process.status "${_name}" "${_file}" "${_pid}"
+      else
+        __sm.log.fail "Either a pidfile or a process id (pid) must be given in order to show process status."
+      fi
+      ;;
+    (running)
+      __sm.process.is.running "${_pid}" "${_file}"
+      ;;
+    (lock)
+      if [[ -n "${_file}" ]]
+      then
+        if __sm.process.lockfile.lock "${_file}"
+        then return 0 ; else return 1 ; fi # Let caller deal with the choice of how to react.
+      else
+        __sm.log.fail "No lockfile was specified for locking."
+  fi
+      ;;
+    (exit)
+      NIY "Process on exit"
+      __sm.process.on.exit ...
+      ;;
+    (*)
+      if [[ -n "${_command}" ]]
+      then
+        __sm.log.fail "Process API command '${_command}' s not handled."
+      else
+        __sm.log.fail "Process API command must be given."
+      fi
+      ;;
+  esac
+}
+

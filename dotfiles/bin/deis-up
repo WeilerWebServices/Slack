@@ -1,0 +1,15 @@
+#!/bin/bash
+
+for project in \
+	builder charts controller deis dockerbuilder etcd fluentd logger minio \
+	monitor object-storage-cli postgres registry router slugbuilder slugrunner \
+	workflow workflow-e2e workflow-manager workflow-manager-api; do
+	cd /Users/jhansen/p/go/src/github.com/deis
+	if [[ -d "$project" ]]; then
+		pushd $project
+		git fa && git pull && git sync
+		popd
+	else
+		git clone git@github.com:deis/$project.git $project
+	fi
+done

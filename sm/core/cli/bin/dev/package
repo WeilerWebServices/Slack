@@ -1,0 +1,10 @@
+#!/bin/sh
+
+[[ -n "${extension_args}" ]] ||
+  __sm.log.error "package: You must specify at least one extension name for packaging."
+
+for extension in "${extension_args[@]}"
+do
+  extension_package "${extension}"
+done
+

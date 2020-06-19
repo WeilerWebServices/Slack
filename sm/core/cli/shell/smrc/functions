@@ -1,0 +1,69 @@
+#!/bin/sh
+
+smrc_install()
+{
+  templates exist "cli/smrc" || __sm.log.fail "The template core cli/smrc is missing."
+
+  if files exist "$HOME/.smrc"
+  then
+    log "You already have a $HOME/.smrc file."
+    log "Renaming it as ${HOME}/.smrc.${timestamp} to retain it."
+    log "Please examine the file, and if it is no longer needed, delete it."
+
+    files move from "$PWD" to "$HOME/.smrc.$timestamp" \
+      "$HOME/.smrc"
+  fi
+
+  # TODO: Read project, repository_url and environment from defaults file.
+  #       ~/.sm/project/config/defaults
+  true \
+    "${repository_url:="username/repository"}"
+
+  templates install "cli/smrc" to "$HOME/.smrc"
+
+  templates seed "$HOME/.smrc" \
+    project "$project" \
+    repository_url "$repository_url" \
+    environment "$environment" \
+    project_search_maxdepth "2"
+}
+
+smrc_update()
+{
+  templates exist "cli/smrc" || __sm.log.fail "The template core sm/smrc is missing."
+
+  typeset template target backup incoming
+  template="cli/smrc"
+  target="$HOME/.smrc"
+  backup="$HOME/.smrc.$timestamp"
+  incoming="$HOME/.smrc.incoming.$$"
+
+  if ! files exist "${target}"
+  then
+    log "File not found ${target}; installing new."
+    smrc_install
+    return
+  fi
+
+  # TODO: Read project, repository_url and environment from defaults file.
+  #       ~/.sm/project/config/defaults
+  : \
+    "${repository_url:="username/repository"}"
+
+  templates update "${template}" "${target}" "${incoming}" \
+    project "$project" \
+    repository_url "$repository_url" \
+    environment "$environment"
+
+  if [[ -s "${incoming}" ]]
+  then
+    log "Backup ${backup}."
+    files copy from "${target}" to "${backup}"
+    log "Incoming settings:"
+    printf "\n" >> "${target}"
+    tee -a "${target}" < "${incoming}"
+  else
+    log "No new settings."
+  fi
+  rm -f "${incoming}" || true
+}

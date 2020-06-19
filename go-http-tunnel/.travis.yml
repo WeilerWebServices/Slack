@@ -1,0 +1,22 @@
+language: go
+sudo: false
+
+go:
+  - tip
+
+matrix:
+    fast_finish: true
+
+addons:
+  apt:
+    packages:
+    - moreutils
+
+before_install:
+  - make devtools
+
+install:
+  - go get -d ./...
+
+script:
+  - make check

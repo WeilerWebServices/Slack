@@ -1,0 +1,3 @@
+#!/bin/sh
+
+complete -C {{sm_path}}/bin/sm-completion sm

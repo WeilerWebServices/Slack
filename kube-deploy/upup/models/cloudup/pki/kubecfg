@@ -1,0 +1,3 @@
+keypair/kubecfg:
+  subject: cn=kubecfg
+  type: client

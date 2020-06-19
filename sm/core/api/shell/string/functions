@@ -1,0 +1,71 @@
+#!/bin/sh
+
+#
+# SM Framework Core Module ~ String (string)
+#
+
+#
+# string contains {string} {content}
+# string append ...
+# string prepend ...
+#
+string()
+{
+  typeset _token _command _string _search _regex
+
+  while (( $# ))
+  do
+    _token="$1" && shift
+    case "${_token}" in
+      (from)
+        _search="$1"
+        (( $# )) && shift || __sm.log.fail "From source string must follow keyword 'from'"
+        ;;
+      (to)
+        _string="$1"
+        ;;
+      (contains)
+        _command=contains
+        _search="$1"
+        (( $# )) && shift || __sm.log.fail "Search (glob) string must follow keyword 'contains'"
+        ;;
+      (*)
+        if [[ -z "${_string}" ]]
+        then
+          _string="${_token}"
+        elif [[ -z "${_search}" ]]
+        then
+          _search="${_token}"
+        fi
+        ;;
+    esac
+  done
+
+  case "${_command}" in
+    (contains)
+      __sm.string.contains "${_search}" "${_string}"
+      ;;
+    (append)
+      printf "${_string}"
+      if ! [[ "${_string}" =~ "${_search}" ]] ; then printf " ${_search}" ; fi
+      ;;
+    (prepend)
+      if ! [[ "${_string}" =~ "${_search}" ]] ; then printf "${_search} " ; fi
+      printf "${_string}"
+      ;;
+    (remove)
+      _string=" ${_string} "               # wrap with spaces.
+      _string="${_string// ${_search} / }" # remove second string.
+      _string="${_string## }"              # remove spaces from beginning.
+      _string="${_string%% }"              # remove spaces from end.
+      printf "${_string}"
+      ;;
+    (truncate)
+      printf ""
+      ;;
+    (*)
+      __sm.log.fail "Unknown string command '${_command}'"
+      ;;
+  esac
+}
+

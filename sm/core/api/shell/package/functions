@@ -1,0 +1,172 @@
+#!/bin/sh
+
+# TODO: Rework this into a 1.0.0 module API
+#
+# ## package install
+#
+# Performs all package installation steps based on selected strategy:
+# preinstall
+#
+# if gnu:
+#     prefetch
+#   fetch
+#     preextract
+#   extract
+#     prepatch
+#   patch
+#     preconfigure
+#   configure
+#     prebuild
+#   build
+#     preinstall
+#   install
+#     preactivate
+#   activate
+#   service setup, if service module is loaded
+#
+# if binary:
+#     prefetch
+#   fetch
+#     preextract
+#   extract
+#     preinstall
+#   install
+#     preactivate
+#   activate
+#   service setup, if service module is loaded
+#
+# postinstall
+#
+package()
+{
+  trace_filter package || set -o xtrace
+  typeset -g package_name package_version package_base_url package_file \
+    package_user archive_format package_md5 package_sha256 package_sha512
+
+  typeset _token _command _logfile _lines _key _log _message
+  typeset -a _params __package_commands
+  _lines=50
+
+  __package_commands=(
+    "is active"
+    "is installed"
+    "configure flag"
+    "configure flags"
+    "make install"
+    "acvtivate first"
+  )
+
+  if __sm.command.detect "$*" "${__package_commands[@]}"
+  then
+    _command="${__sm_command_dotted}"
+    shift "${__sm_command_words}"
+  else
+    __sm.log.fail "No command given.\nUsage:  \nfiles <command> ..."
+  fi
+
+  case "${_command}" in
+    (define)
+      _params+=( "$@" )
+      shift $#
+      ;;
+  esac
+
+
+  while (( $# ))
+  do
+    _token="$1" && shift
+    case "${_token}" in
+      (log)
+        _log="$1"
+        (( $# )) && shift || __sm.log.fail "Log file path/name must be given following keyword 'log'"
+        ;;
+      (lines)
+        _lines="$1"
+        (( $# )) && shift || __sm.log.fail "Number of lines to show must be given following keyword 'lines'"
+        ;;
+      (message)
+        _message="$1"
+        (( $# )) && shift || __sm.log.fail "Message must be given following keyword 'message'"
+        ;;
+      (key)
+        _key="$1"
+        (( $# )) && shift || __sm.log.fail "Key name must follow keyword 'key'"
+        ;;
+      (name)
+        package_name="$1"
+        (( $# )) && shift || __sm.log.fail "a package name must follow keyword 'name'"
+        ;;
+      (version)
+        package_version="$1"
+        (( $# )) && shift || __sm.log.fail "a package version must follow keyword 'version'"
+        ;;
+      (base_url)
+        package_base_url="$1"
+        (( $# )) && shift || __sm.log.fail "a package base_url must follow keyword 'base_url'"
+        ;;
+      (file)
+        package_file="$1"
+        (( $# )) && shift || __sm.log.fail "a package file name must follow keyword 'file'"
+        ;;
+      (user)
+        package_user="$1"
+        (( $# )) && shift || __sm.log.fail "a package user name must follow keyword 'user'"
+        ;;
+      (archive_format)
+        archive_format="$1"
+        (( $# )) && shift || __sm.log.fail "a package archive_format must follow keyword 'archive_format'"
+        ;;
+      (md5)
+        package_md5="$1"
+        (( $# )) && shift || __sm.log.fail "a package md5 sum must follow keyword 'md5'"
+        ;;
+      (sha256)
+        package_sha256="$1"
+        (( $# )) && shift || __sm.log.fail "a package sha256 key must follow keyword 'sha256'"
+        ;;
+      (sha512)
+        package_sha512="$1"
+        (( $# )) && shift || __sm.log.fail "a package sha512 key must follow keyword 'sha512'"
+        ;;
+      (*)
+        _params+=("${_token}")
+        ;;
+    esac
+  done
+
+  true ${package_name:=${extension}}
+
+  [[ -n "${package_name}" ]]    || __sm.log.fail "Package name must be set/given"
+
+  case "${_command}" in
+    (cli|make|make.install|is.active|is.installed|install|uninstall|info|configure|configure.flags)
+      __sm.package.${_command} "${_params[@]}"
+      ;;
+    (configure.flag)
+      __sm.package.configure.flag "${_key}" "${_params[@]}"
+      ;;
+    (define)
+      [[ -n "${_params}" ]] || __sm.log.fail "No '{key} {value}' pairs given."
+      if array is even _params
+      then
+        __sm.package.define "${_params[@]}"
+      else
+        __sm.log.fail "Every key must have an associated value."
+      fi
+      ;;
+    (activate|activate.first|deactivate)
+      __sm.package.${_command} "${package_name}" "${package_version}"
+      ;;
+    (initialize)
+      declare -a package_dependencies
+      declare -a configure_flags
+      __sm.package.init
+      ;;
+    (error)
+      [[ -n "${_message}" ]] || __sm.log.fail "Message must be given for package error."
+      __sm.package.error "${_params[@]}" "${_log}" "${_lines}"
+      ;;
+    (*)
+      __sm.log.fail "Unknown package command '${_token}'"
+  esac
+}

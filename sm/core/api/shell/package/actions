@@ -1,0 +1,20 @@
+package/install=package install()
+install=package install()
+
+package/uninstall=package uninstall()
+uninstall=package uninstall()
+
+package/update=package update()
+update=package update()
+
+package/info=package info()
+info=package info()
+
+package/activate=package activate()
+activate=package activate()
+
+package/deactivate=package deactivate()
+deactivate=package deactivate()
+
+package/man=package man()
+man=package man()

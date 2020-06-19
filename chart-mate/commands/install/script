@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+
+# To implement this command, edit the "Command implementation" section below.
+
+# Usage
+# -----
+
+# Comments prefixed with `#/` are managed by stubbs.
+# The `command` and `usage` comments describe the command
+# and show its options.
+#
+#/ command: chart-mate:install: "install deis with helm"
+#/ usage: rerun chart-mate:install [options]
+
+# Load common functions
+# ---------------------
+
+# Load the function library for this module.
+# This loads rerun functions, too.
+. $RERUN_MODULE_DIR/lib/functions.sh install || {
+  echo >&2 "Failed loading function library." ; exit 1 ;
+}
+
+# Error handling
+# ---------------
+
+# This script is designed to _fail-fast_.
+
+# Trap errors and exit. The call to `rerun_die` will print the
+# the error message and exit with the error command exit status.
+
+trap 'rerun_die $? "*** command failed: chart-mate:install. ***"' ERR
+
+# Run [set] `nounset` to treat unset variables as errors. Set [pipefail]
+# so a pipeline return status is the value of the last
+# (rightmost) command to exit with non-zero status.
+#
+# [set]: http://ss64.com/bash/set.html
+# [pipefail]: http://www.gnu.org/software/bash/manual/html_node/Pipelines.html
+
+set -eo pipefail
+
+# Command variables
+# -----------------
+
+# This command script can access the following variables
+# declared by `rerun` or by the option parser function.
+
+#/ rerun-variables: RERUN, RERUN_VERSION, RERUN_MODULES, RERUN_MODULE_DIR
+#/ option-variables:
+
+# The `rerun_options_parse` function processes the command line
+# arguments. Each accepted command line flag results in setting
+# one the corresponding option variables.
+
+rerun_options_parse "$@"
+
+load-config
+
+rm -rf ${HOME}/.helm
+helm doctor
+mkdir -p ${HOME}/.helm/cache/charts/deis
+
+if [ ! -z $CI ]; then
+  echo "INJECTING VERSIONS!"
+  echo "-------------------"
+  bumpver-if-set "deis-logger" "fluentd" "${FLUENTD_GIT_SHA}"
+  bumpver-if-set "deis-logger" "logger" "${LOGGER_GIT_SHA}"
+  bumpver-if-set "${WORKFLOW_CHART}" "builder" "${BUILDER_GIT_SHA}"
+  bumpver-if-set "${WORKFLOW_CHART}" "minio" "${MINIO_GIT_SHA}"
+  bumpver-if-set "${WORKFLOW_CHART}" "postgres" "${POSTGRES_GIT_SHA}"
+  bumpver-if-set "${WORKFLOW_CHART}" "registry" "${REGISTRY_GIT_SHA}"
+  bumpver-if-set "${WORKFLOW_CHART}" "router" "${ROUTER_GIT_SHA}"
+  bumpver-if-set "${WORKFLOW_CHART}" "controller" "${CONTROLLER_GIT_SHA}"
+  bumpver-if-set "${WORKFLOW_CHART}" "slugbuilder" "${SLUGBUILDER_GIT_SHA}"
+  bumpver-if-set "${WORKFLOW_CHART}" "slugrunner" "${SLUGRUNNER_GIT_SHA}"
+  bumpver-if-set "${WORKFLOW_CHART}" "dockerbuilder" "${DOCKERBUILDER_GIT_SHA}"
+  echo "-------------------"
+  rsync -av . ${HOME}/.helm/cache/deis/ > /dev/null
+else
+  helm repo add deis https://github.com/deis/charts.git || true
+fi
+
+helm fetch deis/"${WORKFLOW_CHART}"
+helm generate "${WORKFLOW_CHART}"
+helm install "${WORKFLOW_CHART}"
+
+if [ ! -z $DEIS_LOGGER ]; then
+  helm fetch deis/deis-logger
+  helm install deis-logger
+  # re-jigger deis-controller pods so it picks up the logger's settings
+  kubectl --namespace=deis scale --replicas=0 replicationcontroller deis-controller
+  kubectl --namespace=deis scale --replicas=1 replicationcontroller deis-controller
+fi

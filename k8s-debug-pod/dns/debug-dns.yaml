@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: debug-dns
+  labels:
+    name: debug-dns
+spec:
+  selector:
+    matchLabels:
+      name: debug-dns
+  template:
+    metadata:
+      labels:
+        name: debug-dns
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      containers:
+      - name: debug
+        image: jhansen/k8s-debug-pod:dns-0.1.0
+        imagePullPolicy: Always
+        command: ["/debug-dns"]
+        env:
+          - name: POD_SLEEP_SECS
+            value: "30"
+          - name: CHECK_KUBE
+            value: "true"
+          - name: CHECK_AZURE
+            value: "true"
+          - name: CHECK_EXTERNAL
+            value: "true"
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+      terminationGracePeriodSeconds: 30

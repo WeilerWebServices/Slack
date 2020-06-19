@@ -1,0 +1,73 @@
+#!/bin/sh
+
+api_extensions_initialize()
+{
+  true "${extensions_development_path:="${extensions_src_path}"}"
+}
+
+extension()
+{
+  trace_filter extensions || set -o xtrace
+
+  typeset _command _params _name _uri __extension_commands
+  _params=()
+  __extension_commands=(
+    "in extension sets do=extension sets iterator"
+    "in extensions do=extension iterator"
+    "read known uri=get uri"
+  )
+
+  if __sm.command.detect "$*" "${__extension_commands[@]}"
+  then
+    _command="${__sm_command_dotted}"
+    shift "${__sm_command_words}"
+  else
+    __sm.log.fail "No command given.\nUsage:  \nextension <command> ..."
+  fi
+
+  while (( $# ))
+  do
+    case "$1" in
+      (name|for|as)
+        _name=$2
+        (( $# >= 2 )) && shift 2 || __sm.log.fail "Extension name was not given after <$1> param."
+        ;;
+      (uri|from)
+        _uri=$2
+        (( $# >= 2 )) && shift 2 || __sm.log.fail "Extension uri was not given after <$1> param."
+        ;;
+      (*)
+        _params+=( "$1" )
+        shift
+        ;;
+    esac
+  done
+
+  case "${_command}" in
+    (get.uri)
+      [[ -n "${_name}" ]] || __sm.log.error "Extension name was not given for get uri."
+      if __sm.extension.get.uri "${_name}"
+      then return 0 ; else return $? ; fi
+      ;;
+    (install)
+      [[ -n "${_name}" ]] || __sm.log.error "Extension name was not given for install."
+      __sm.modules.include internal/extensions/manipulation
+      if __sm.extension.install "${_name}" "${_uri}"
+      then return 0 ; else return $? ; fi
+      ;;
+    (search|find)
+      [[ -n "${_name}" ]] || __sm.log.error "Extension name was not given for search."
+      if __sm.extension.in.paths __sm.extension.find "${_name}"
+      then
+        printf "${extensions_path}/${extension}\n"
+      else
+        __sm.log.error "Extension '${_name}' not found!"
+      fi
+      ;;
+    (extension.sets.iterator|extension.iterator)
+      __sm.extension.in.paths __sm.${_command} "${_params[@]}" || true
+      return 0
+      ;;
+    (*) __sm.log.error "Unknown command for extension '${_command}'."
+  esac
+}

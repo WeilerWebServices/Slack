@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# TODO: Rework this into a 1.0.0 module API
+
+step()
+{
+  typeset name
+  name="$1"
+
+  (( $# )) && shift || __sm.log.fail "Cannot take step as no step name given;"\
+    "step [name] <- missing name."
+
+  __sm.step.start "$name"
+
+  if __sm.command.exists before_step
+  then
+    before_step "$name" "$@"
+  fi
+
+  "$name" "$@"
+
+  if __sm.command.exists after_step
+  then
+    after_step "$name" "$@"
+  fi
+}
+
+steps()
+{
+  for step in $@
+  do
+    step "${step}"
+  done
+}
+

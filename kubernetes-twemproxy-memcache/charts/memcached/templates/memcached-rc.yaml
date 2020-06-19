@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: {{ printf "%s-%s" .Release.Name "memcached" | trunc 24 }}
+  labels:
+    provider: memcached
+    release: {{ .Release.Name | quote }}
+spec:
+  replicas: {{ .Values.memcacheReplicas }}
+  selector:
+    provider: memcached
+    release: {{ .Release.Name | quote }}
+  template:
+    metadata:
+      labels:
+        provider: memcached
+        release: {{ .Release.Name | quote }}
+        version: {{ .Values.imageTag | quote }}
+    spec:
+      containers:
+      - name: memcached
+        image: memcached:{{ .Values.imageTag }}
+        command: ["memcached", "-m", {{ .Values.memcacheMemory | quote }} ]
+        ports:
+        - name: memcache
+          containerPort: 11211
+        resources:
+          requests:
+            memory: "{{ .Values.memcacheMemory }}Mi"
+          limits:
+            memory: "{{ add 1 .Values.memcacheMemory }}Mi"
+        livenessProbe:
+          tcpSocket:
+            port: memcache
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          tcpSocket:
+            port: memcache
+          initialDelaySeconds: 5
+          timeoutSeconds: 1

@@ -1,0 +1,43 @@
+#!/bin/sh
+
+NYI "sm update"
+# What is this code intended to do?
+
+#extension_action=${extension_args[${__sm_array_start}]}
+#
+#case "$extension_action" in
+#  repo|repository)
+#    fetch_extensions_git_repository
+#  ;;
+#
+#  help|usage)
+#    log "Usage:"
+#    log "sm extensions update repository"
+#  ;;
+#
+#  all)
+#    extensions=($(__sm.extension.in ...)) #missing path
+#
+#    # TODO: Updates for released extensions instead of only from repository.
+#    if [[ -n "${extension_args}" ]]
+#    then
+#      fetch_extensions_git_repository
+#
+#      extensions_install "${extensions[@]}"
+#    else
+#      log "No extensions to update."
+#    fi
+#    ;;
+#
+#  *)
+#    # TODO: Updates for released extensions instead of only from repository.
+#    if variables are nonempty extension_action
+#    then
+#      fetch_extensions_git_repository
+#      extensions_install "${extension_args[@]}"
+#    else
+#      log "Usage:"
+#      log "sm extensions update [extension [extension [...]]"
+#    fi
+#  ;;
+#esac

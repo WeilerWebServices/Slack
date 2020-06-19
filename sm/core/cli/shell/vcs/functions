@@ -1,0 +1,6 @@
+#!/bin/sh
+
+scm_help()
+{
+  NIY "display help for scm"
+}

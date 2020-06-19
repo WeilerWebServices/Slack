@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+.nyc_output
+*.lcov
+*.log
+examples/*/.env
+package-lock.json

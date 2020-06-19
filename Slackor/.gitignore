@@ -1,0 +1,10 @@
+dist/agent.32.linux
+dist/agent.64.linux
+dist/agent.darwin
+dist/agent.upx.exe
+dist/agent.windows.exe
+slackor.db
+resource.syso
+versioninfo.json
+versioninfo.manifest
+icon.ico

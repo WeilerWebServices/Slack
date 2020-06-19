@@ -1,0 +1,11 @@
+service/start=service start()
+start=service start()
+
+service/stop=service stop()
+stop=service stop()
+
+service/restart=service restart()
+restart=service restart()
+
+service/status=service status()
+status=service status()

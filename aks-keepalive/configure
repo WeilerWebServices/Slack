@@ -1,0 +1,18 @@
+#!/bin/sh
+
+set -e
+
+echo "Current keepalive settings:"
+echo -n "/proc/sys/net/ipv4/tcp_keepalive_time="
+cat /proc/sys/net/ipv4/tcp_keepalive_time
+echo -n "/proc/sys/net/ipv4/tcp_keepalive_intvl="
+cat /proc/sys/net/ipv4/tcp_keepalive_intvl
+echo -n "/proc/sys/net/ipv4/tcp_keepalive_probes="
+cat /proc/sys/net/ipv4/tcp_keepalive_probes
+
+while true; do
+	echo 120 > /proc/sys/net/ipv4/tcp_keepalive_time
+	echo 30 > /proc/sys/net/ipv4/tcp_keepalive_intvl
+	echo 4 > /proc/sys/net/ipv4/tcp_keepalive_probes
+	sleep 30
+done

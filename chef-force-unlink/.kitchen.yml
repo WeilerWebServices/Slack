@@ -1,0 +1,21 @@
+---
+driver_plugin: vagrant
+driver_config:
+  require_chef_omnibus: 11.10.4
+
+platforms:
+- name: ubuntu-12.04
+  driver_config:
+    box: opscode-ubuntu-12.04
+    box_url: https://opscode-vm-bento.s3.amazonaws.com/vagrant/opscode_ubuntu-12.04_provisionerless.box
+
+suites:
+- name: setup
+  run_list:
+    - recipe[force-unlink::setup]
+    - recipe[force-unlink]
+  attributes:
+    force-unlink:
+        target: "/tmp/force-unlink"
+        source: "/tmp/some-source-file"
+

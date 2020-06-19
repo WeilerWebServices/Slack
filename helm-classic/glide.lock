@@ -1,0 +1,148 @@
+hash: 3e5fafe60be210a1ef82b197ccc8e8465e644decb3d051fececa4a6890288759
+updated: 2016-04-21T11:02:18.91931022-07:00
+imports:
+- name: bitbucket.org/ww/goautoneg
+  version: 75cd24fc2f2c
+- name: code.google.com/p/goprotobuf
+  version: bf531ff1a004f24ee53329dfd5ce0b41bfdc17df
+  repo: https://github.com/golang/protobuf
+- name: github.com/aokoli/goutils
+  version: 9c37978a95bd5c709a15883b6242714ea6709e64
+- name: github.com/beorn7/perks
+  version: b965b613227fddccbfffe13eae360ed3fa822f8d
+  subpackages:
+  - quantile
+- name: github.com/BurntSushi/toml
+  version: bbd5bb678321a0d6e58f1099321dfa73391c1b6f
+- name: github.com/cloudfoundry-incubator/candiedyaml
+  version: 5cef21e2e4f0fd147973b558d4db7395176bcd95
+- name: github.com/codegangsta/cli
+  version: 71f57d300dd6a780ac1856c005c4b518cfd498ec
+- name: github.com/davecgh/go-spew
+  version: 3e6e67c4dcea3ac2f25fd4731abc0e1deaf36216
+  subpackages:
+  - spew
+- name: github.com/deis/pkg
+  version: 7f41ea6de942139d5de67f4d4cb2cccced991f6f
+  subpackages:
+  - prettyprint
+- name: github.com/docker/docker
+  version: 2b27fe17a1b3fb8472fde96d768fa70996adf201
+  subpackages:
+  - pkg/jsonmessage
+  - pkg/mount
+  - pkg/parsers
+  - pkg/symlink
+  - pkg/term
+  - pkg/timeutils
+  - pkg/units
+- name: github.com/docker/libcontainer
+  version: 5dc7ba0f24332273461e45bc49edcb4d5aa6c44c
+  subpackages:
+  - cgroups/fs
+  - configs
+  - cgroups
+  - system
+- name: github.com/ghodss/yaml
+  version: 1a6f069841556a7bcaff4a397ca6e8328d266c2f
+- name: github.com/golang/glog
+  version: 44145f04b68cf362d9c4df2182967c2275eaefed
+- name: github.com/golang/protobuf
+  version: 7f07925444bb51fa4cf9dfe6f7661876f8852275
+  subpackages:
+  - proto
+- name: github.com/google/go-github
+  version: 81d0490d8aa8400f6760a077f4a2039eb0296e86
+  subpackages:
+  - github
+- name: github.com/google/go-querystring
+  version: 9235644dd9e52eeae6fa48efd539fdc351a0af53
+  subpackages:
+  - query
+- name: github.com/google/gofuzz
+  version: bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5
+- name: github.com/juju/ratelimit
+  version: 772f5c38e468398c4511514f4f6aa9a4185bc0a0
+- name: github.com/Masterminds/semver
+  version: 808ed7761c233af2de3f9729a041d68c62527f3a
+- name: github.com/Masterminds/sprig
+  version: e6494bc7e81206ba6db404d2fd96500ffc453407
+- name: github.com/Masterminds/vcs
+  version: fa85cceafacd29c84a8aa6e68967bb9f1754e5e3
+- name: github.com/matttproud/golang_protobuf_extensions
+  version: fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a
+  subpackages:
+  - pbutil
+- name: github.com/pborman/uuid
+  version: c55201b036063326c5b1b89ccfe45a184973d073
+- name: github.com/prometheus/client_golang
+  version: 3b78d7a77f51ccbc364d4bc170920153022cfd08
+  subpackages:
+  - prometheus
+- name: github.com/prometheus/client_model
+  version: fa8ad6fec33561be4280a8f0514318c79d7f6cb6
+  subpackages:
+  - go
+- name: github.com/prometheus/common
+  version: ef7a9a5fb138aa5d3a19988537606226869a0390
+  subpackages:
+  - expfmt
+  - model
+- name: github.com/prometheus/procfs
+  version: 490cc6eb5fa45bf8a8b7b73c8bc82a8160e8531d
+- name: github.com/spf13/pflag
+  version: 8e7dc108ab3a1ab6ce6d922bbaff5657b88e8e49
+- name: github.com/steveeJ/gexpect
+  version: ca42424d18c76d0d51a4cccd830d11878e9e5c17
+  repo: https://github.com/coreos/gexpect
+- name: golang.org/x/crypto
+  version: 7b428712abe956d0e9e1e9a01e163fb6c7171438
+  subpackages:
+  - ssh/terminal
+  - nacl/box
+  - curve25519
+  - nacl/secretbox
+  - salsa20/salsa
+  - ssh
+  - poly1305
+- name: golang.org/x/net
+  version: c2528b2dd8352441850638a8bb678c2ad056fd3e
+  subpackages:
+  - context
+  - html
+  - websocket
+- name: gopkg.in/yaml.v2
+  version: a83829b6f1293c91addabc89d0571c246397bbf4
+- name: k8s.io/kubernetes
+  version: 92635e23dfafb2ddc828c8ac6c03c7a7205a84d8
+  subpackages:
+  - pkg
+  - pkg/api
+  - pkg/api/unversioned
+  - pkg/api/v1
+  - pkg/apis/extensions/v1beta1
+  - pkg/api/meta
+  - pkg/api/resource
+  - pkg/auth/user
+  - pkg/conversion
+  - pkg/fields
+  - pkg/labels
+  - pkg/runtime
+  - pkg/types
+  - pkg/util
+  - pkg/util/rand
+  - pkg/util/sets
+  - pkg/api/registered
+  - pkg/apis/extensions
+  - third_party/forked/reflect
+  - pkg/util/fielderrors
+  - pkg/util/validation
+  - pkg/util/yaml
+  - pkg/api/util
+  - pkg/util/errors
+- name: launchpad.net/gocheck
+  version: 4f90aeace3a26ad7021961c297b22c42160c7b25
+  repo: https://github.com/go-check/check
+- name: speter.net/go/exp/math/dec/inf
+  version: 42ca6cd68aa922bc3f32f1e056e61b65945d9ad7
+devImports: []
